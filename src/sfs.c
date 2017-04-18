@@ -27,6 +27,7 @@
 #include <sys/xattr.h>
 #endif
 
+#include "knoten.h"
 #include "log.h"
 
 
