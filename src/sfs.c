@@ -22,6 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <time.h>
 
 #ifdef HAVE_SYS_XATTR_H
 #include <sys/xattr.h>
@@ -51,7 +52,7 @@
  //TODO superblock (4KB)
  //TODO ibitmap (4KB) and data bitmap (4KB)
  
- fileControlBlock inodes[64];
+fileControlBlock inodes[64];
  
 void *sfs_init(struct fuse_conn_info *conn)
 {
@@ -73,16 +74,44 @@ void *sfs_init(struct fuse_conn_info *conn)
 		else
 			log_msg("\n Magic number does not match.\n");
 		
+		
+		//check if root dir
+		if(strcmp(inodes[1].fileName, "/")){
+			
+		
+		}
+				
 		for(int i = 0; i < sBlock.numDataBlocks; i++){
 			
 			int isSucc = block_read(i, inodes[i]);
 			
 			if(isSucc){
 				//check types of files, ex. data vs directory
-			
+				fileControlBlock fcb = inodes[i];
+				
+				//check if dir 
+				if(fcb.fileType == DIR){
+					
+					
+				
+				} 
+				//check if we have file
+				else if(fcb.fileType == FILE){
+				
+					// set the data bmap
+					if(fcb.fileSize < 1)
+						sBlock.dbmap[i] = NOT_USED;
+					else
+						sBlock.dbmap[i] = USED;
+				
+				
+				}
+				
+				
+				
 			} else {
 			
-			
+				log_msg("\n Error trying to block read inode[].\n",);
 			}
 			
 		
@@ -96,9 +125,23 @@ void *sfs_init(struct fuse_conn_info *conn)
 		sBlock.magicNum = 666;
 		sBlock.numInodes = 64;
 		sBlock.numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
-		sBlock.inodeStartIndex = 1; //
+		sBlock.inodeStartIndex = 1; // index of the first inode struct
 		
 		
+		// set up root dir
+		inodes[0].fileName = "/";
+		inodes[0].fileSize = 0;
+		inodes[0].parentDir = -1;
+		inodes[0].fileType = DIR;
+		inodes[0].uid = getuid();
+		inodes[0].time = time(NULL);
+		inodes[0].dirContents = NULL;
+		
+		/* TODO: lookup these fields and assign to root dir appropriately
+		short mode; //can this file be read/written/executed?
+		char block[60]; //a set of disk pointers (15 total)
+		long time; //what time was this file last accessed?
+		*/
 	
 	}
  	   
@@ -133,6 +176,15 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
+    
+    
+    // TODO ACCOUNT FOR THE FOLLOWING ERRORS:
+    // EACCES (permission denied), EIO (error while reading), ELOOP (loop exists in symbolic links),
+    // ENAMETOOLONG (length of path argument is too long), ENOENT (component of path does not exist or empty 
+    // ENOTDIR (component of path prefix is not a directory), EOVERFLOW (file size in bytes or number of blocks cannot be repsented correctly)
+    
+    
+    // find file and modify attributes in statbuf according to absolute path of parameter
     
     log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 	  path, statbuf);
