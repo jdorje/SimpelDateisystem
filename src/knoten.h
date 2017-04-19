@@ -1,11 +1,45 @@
 #ifndef __KNOTEN_H__
 #define __KNOTEN_H__
 
+
+#define MAX_BLOCKS 512
+#define NAME_SIZE 256
+
+typedef enum {
+	
+	FILE,
+	DIR
+
+} fileType;
+
 typedef struct {
+
+	int magicNum; //fat32, ext2 etc.
+	int numInodes; //total number of inodes
+	int numDataBlocks; // total number of data blocks
+	int inodeStartIndex; //the index of the start of the first inode
+	
+	char ibmap[MAX_BLOCKS];
+	char dbmap[MAX_BLOCKS];
+
+} superblock;
+
+typedef struct {
+
+	char fileName[NAME_SIZE];
+	long fileSize;
+	int parentDir;
+	fileType fileType;
 	short mode; //can this file be read/written/executed?
 	short uid; //who owns this file?
-	long size; //how many bytes are in this file?
+	char block[60]; //a set of disk pointers (15 total)
 	long time; //what time was this file last accessed?
+	
+} fileControlBlock;
+
+typedef struct {
+
+	long size; //how many bytes are in this file?
 	long ctime; //what time was this file created?
 	long mtime; //what time was this file last modified?
 	long dtime; //what time was this inode deleted?
@@ -14,7 +48,7 @@ typedef struct {
 	long blocks; //how many blocks have been allocated to this file?
 	long flags; //how should ext2 use this inode?
 	long osd1; //an OS-dependent field
-	char block[60]; //a set of disk pointers (15 total)
+
 	long generation; //file version (used by NFS)
 	long file_acl; //a new permissions model beyond mode bits
 	long dir_acl; //called access control lists

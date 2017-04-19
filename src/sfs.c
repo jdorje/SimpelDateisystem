@@ -47,11 +47,64 @@
  * Introduced in version 2.3
  * Changed in version 2.6
  */
+ 
+ //TODO superblock (4KB)
+ //TODO ibitmap (4KB) and data bitmap (4KB)
+ 
+fileControlBlock inodes[64];
+ 
 void *sfs_init(struct fuse_conn_info *conn)
 {
     fprintf(stderr, "in bb-init\n");
     log_msg("\nsfs_init()\n");
-    
+ 
+ 	char buf[BLOCK_SIZE];
+ 	superblock sBlock;
+ 	int ret = block_read(0, buf);
+ 	
+	//check if superblock is created, if not create one
+	if( ret != 0){
+	
+		memcpy(sBlock, buf, ret);
+		
+		// check if file system matches ours
+		if(sBlock->magicNum != 666)
+			//convert to our file system
+		else
+			log_msg("\n Magic number does not match.\n");
+		
+		for(int i = 0; i < sBlock.numDataBlocks; i++){
+			
+			int isSucc = block_read(i, inodes[i]);
+			
+			if(isSucc){
+				//check types of files, ex. data vs directory
+			
+			} else {
+			
+			
+			}
+			
+		
+		}
+		
+		
+	} 
+	// Create everything from the start
+	else {
+	
+		sBlock.magicNum = 666;
+		sBlock.numInodes = 64;
+		sBlock.numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
+		sBlock.inodeStartIndex = 1; //
+		
+		
+	
+	}
+ 	   
+ 	//use block read to 
+ 	   
+ 	   
     log_conn(conn);
     log_fuse_context(fuse_get_context());
 
