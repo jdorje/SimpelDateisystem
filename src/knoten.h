@@ -19,6 +19,13 @@ typedef enum {
 
 } status;
 
+typedef enum {
+	
+	TRUE,
+	FALSE
+
+} BOOL;
+
 typedef struct {
 
 	int magicNum; //fat32, ext2 etc.
@@ -70,5 +77,9 @@ typedef struct {
 	long file_acl; //a new permissions model beyond mode bits
 	long dir_acl; //called access control lists
 } iknoten;
+
+
+
+
 
 #endif
