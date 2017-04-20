@@ -12,6 +12,20 @@ typedef enum {
 
 } fileType;
 
+typedef enum {
+	
+	USED,
+	NOT_USED
+
+} status;
+
+typedef enum {
+	
+	TRUE,
+	FALSE
+
+} BOOL;
+
 typedef struct {
 
 	int magicNum; //fat32, ext2 etc.
@@ -19,21 +33,31 @@ typedef struct {
 	int numDataBlocks; // total number of data blocks
 	int inodeStartIndex; //the index of the start of the first inode
 	
-	char ibmap[MAX_BLOCKS];
-	char dbmap[MAX_BLOCKS];
+	status ibmap[MAX_BLOCKS];
+	status dbmap[MAX_BLOCKS];
 
 } superblock;
 
 typedef struct {
 
+	fileControlBlock *fileOrDir; //current fcb in list
+	fcbNode *head;
+	fcbNode *next;
+
+} fcbNode;
+
+
+typedef struct {
+
 	char fileName[NAME_SIZE];
-	long fileSize;
+	long fileSize; // number of files in directory or size of actual file
 	int parentDir;
 	fileType fileType;
 	short mode; //can this file be read/written/executed?
 	short uid; //who owns this file?
 	char block[60]; //a set of disk pointers (15 total)
 	long time; //what time was this file last accessed?
+	fcbNode *dirContents; //null if file control block is a file
 	
 } fileControlBlock;
 
@@ -53,5 +77,9 @@ typedef struct {
 	long file_acl; //a new permissions model beyond mode bits
 	long dir_acl; //called access control lists
 } iknoten;
+
+
+
+
 
 #endif

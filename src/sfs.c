@@ -22,6 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <time.h>
 
 #ifdef HAVE_SYS_XATTR_H
 #include <sys/xattr.h>
@@ -73,16 +74,44 @@ void *sfs_init(struct fuse_conn_info *conn)
 		else
 			log_msg("\n Magic number does not match.\n");
 		
+		
+		//check if root dir
+		if(strcmp(inodes[1].fileName, "/") == 0){
+			
+		
+		}
+				
 		for(int i = 0; i < sBlock.numDataBlocks; i++){
 			
 			int isSucc = block_read(i, inodes[i]);
 			
 			if(isSucc){
 				//check types of files, ex. data vs directory
-			
+				fileControlBlock fcb = inodes[i];
+				
+				//check if dir 
+				if(fcb.fileType == DIR){
+					
+					
+				
+				} 
+				//check if we have file
+				else if(fcb.fileType == FILE){
+				
+					// set the data bmap
+					if(fcb.fileSize < 1)
+						sBlock.dbmap[i] = NOT_USED;
+					else
+						sBlock.dbmap[i] = USED;
+				
+				
+				}
+				
+				
+				
 			} else {
 			
-			
+				log_msg("\n Error trying to block read inode[].\n",);
 			}
 			
 		
@@ -96,9 +125,23 @@ void *sfs_init(struct fuse_conn_info *conn)
 		sBlock.magicNum = 666;
 		sBlock.numInodes = 64;
 		sBlock.numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
-		sBlock.inodeStartIndex = 1; //
+		sBlock.inodeStartIndex = 1; // index of the first inode struct
 		
 		
+		// set up root dir
+		inodes[0].fileName = "/";
+		inodes[0].fileSize = 0;
+		inodes[0].parentDir = -1;
+		inodes[0].fileType = DIR;
+		inodes[0].uid = getuid();
+		inodes[0].time = time(NULL);
+		inodes[0].dirContents = NULL;
+		
+		/* TODO: lookup these fields and assign to root dir appropriately
+		short mode; //can this file be read/written/executed?
+		char block[60]; //a set of disk pointers (15 total)
+		long time; //what time was this file last accessed?
+		*/
 	
 	}
  	   
@@ -134,10 +177,128 @@ int sfs_getattr(const char *path, struct stat *statbuf)
     int retstat = 0;
     char fpath[PATH_MAX];
     
+   // TODO ACCOUNT FOR THE FOLLOWING ERRORS:
+    // EACCES (permission denied), EIO (error while reading), ELOOP (loop exists in symbolic links),
+    // ENAMETOOLONG (length of path argument is too long), ENOENT (component of path does not exist or empty 
+    // ENOTDIR (component of path prefix is not a directory), EOVERFLOW (file size in bytes or number of blocks cannot be repsented correctly)
+    
+    fileControlBlock *fileHandle = findFile(path);
+    
+    // check if path name is too long
+    if(strlen(path) > PATH_MAX){
+		log_msg("\nENAMETOOLONG)\n");
+		log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
+		path, statbuf);
+    }
+
+
+    // find file and modify attributes in statbuf according to absolute path of parameter
+    
     log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 	  path, statbuf);
     
-    return retstat;
+    return retstat;	
+}
+
+/*
+*  Finds the specific file control block for the given
+*   file path passed in the parameter
+*/
+fileControlBlock *findFile(const char *filePath, fileControlBlock curr){
+
+	// check for valid path length
+	if(strlen(filePath < 2))
+		log_msg("\nEIO\n");
+
+   	
+	BOOL found = FALSE;
+	BOOL lastToken = FALSE;
+	char *temp = malloc(sizeof(char) * strlen(filePath));
+	//add one to account for forward slash
+	char compareChar = *filePath + 1;
+	int i = 0;
+	
+	while(strcmp(compareChar + i, "/") != 0){
+	
+		if(compareChar + i == '\0'){
+			lastToken = TRUE;
+			break;
+		}
+		
+		i++;
+	}
+	
+	//copy temp name to temp string
+	memcpy(temp, filePath, i);
+	
+	int x = 0;
+	while(found == FALSE){
+	
+		fileControlBlock *currFCB = inode[x];
+		// found the file name
+		if(strcmp(currFCB.fileName, temp) == 0){
+			
+			if(lastToken == TRUE){
+				//check if dir or not
+				if(currFCB.fileType == DIR){
+					log_msg("\nEIO: last path string is a directory)\n");
+				} else if(currFCB.fileType == FILE){
+				
+					//end condition HERE, this is what we want
+					found = TRUE;
+					return currFCB;
+			
+				}	
+			
+			} else if(lastToken == FALSE){
+				//check if dir or not
+				if(currFCB.fileType == DIR){
+			
+					// recursively search subdirectories
+					// will use the fcbNodes
+					findFile(filePath + strlen(temp), currFCB);
+					 
+				} else if(currFCB.fileType == FILE){
+					//error file name in middle of path name
+					log_msg("\nENOTDIR: A component in the path prefix is not a directory.\n");
+			
+				}	
+			
+			
+			
+			}
+
+			
+		} 
+		// temp name did not match, search current directory
+		else {
+		
+			
+			fileControlBlock *tempFCB = curr;
+			fcbNode *currNode = tempFCB->dirContents;
+			while(currNode->next != NULL){
+			
+			
+				if(strcmp(temp, currNode->fileControlBlock->fileName) == 0){
+					// recursively search subdirectories
+					// will use the fcbNodes
+					findFile(filePath + strlen(temp), currNode->fileControlBlock);
+				}
+
+				currNode = currNode->next;
+			}
+		
+		
+		
+		}
+			
+	
+		x++;
+	}
+	
+	log_msg("\nENOENT: Component does not exist or is empty string.\n");
+	return NULL;
+
 }
 
 /**
