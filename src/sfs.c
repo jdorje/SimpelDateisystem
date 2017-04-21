@@ -58,19 +58,24 @@ void *sfs_init(struct fuse_conn_info *conn)
 {
     fprintf(stderr, "in bb-init\n");
     log_msg("\nsfs_init()\n");
- 
- 	char buf[BLOCK_SIZE];
+ 	   
+    //log_conn(conn);
+    //log_fuse_context(fuse_get_context());
+	disk_open(SFS_DATA->diskfile);
+ 	char *buf = malloc(sizeof(char) * BLOCK_SIZE);
+	
  	superblock sBlock;
  	int ret = block_read(0, buf);
- 	
+	log_msg("\n First block read result: %d \n", ret);
 	//check if superblock is created, if not create one
 	if( ret != 0){
 	
+		log_msg("\n Superblock loaded...\n");
 		memcpy(&sBlock, buf, ret);
 		
 		// check if file system matches ours
-		if(sBlock.magicNum != 666){
-
+		if(sBlock.magicNum == 666){
+			log_msg("\n Magic number MATCHES OURS.\n");
 		}
 		//convert to our file system
 		else {
@@ -87,7 +92,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 		for(; i < sBlock.numDataBlocks; i++){
 			
 			int isSucc = block_read(i, &inodes[i]);
-			
+			log_msg("\n Reading inodes...\n");
 			if(isSucc){
 				//check types of files, ex. data vs directory
 				fileControlBlock fcb = inodes[i];
@@ -95,12 +100,13 @@ void *sfs_init(struct fuse_conn_info *conn)
 				//check if dir 
 				if(fcb.fileType == IS_DIR){
 					
-					
+					log_msg("\n dir found.\n");
 				
 				} 
 				//check if we have file
 				else if(fcb.fileType == IS_FILE){
 				
+					log_msg("\n file found.\n");
 					// set the data bmap
 					if(fcb.fileSize < 1)
 						sBlock.dbmap[i] = NOT_USED;
@@ -125,7 +131,9 @@ void *sfs_init(struct fuse_conn_info *conn)
 	// Create everything from the start
 	else {
 	
+		log_msg("\n Creating file system from scratch...\n");
 		sBlock.magicNum = 666;
+		block_write(0, "666 MAGICNUM");
 		sBlock.numInodes = 64;
 		sBlock.numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
 		sBlock.inodeStartIndex = 1; // index of the first inode struct
@@ -151,9 +159,7 @@ void *sfs_init(struct fuse_conn_info *conn)
  	   
  	//use block read to 
  	   
- 	   
-    log_conn(conn);
-    log_fuse_context(fuse_get_context());
+ 
 
     return SFS_DATA;
 }
