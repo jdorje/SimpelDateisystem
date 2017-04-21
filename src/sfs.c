@@ -182,17 +182,45 @@ int sfs_getattr(const char *path, struct stat *statbuf)
     // ENAMETOOLONG (length of path argument is too long), ENOENT (component of path does not exist or empty 
     // ENOTDIR (component of path prefix is not a directory), EOVERFLOW (file size in bytes or number of blocks cannot be repsented correctly)
     
-    fileControlBlock *fileHandle = findFile(path);
-    
-    // check if path name is too long
+       // check if path name is too long
     if(strlen(path) > PATH_MAX){
-		log_msg("\nENAMETOOLONG)\n");
+		log_msg("\nENAMETOOLONG\n");
 		log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 		path, statbuf);
     }
 
+	// find file 
+    fileControlBlock *fileHandle = findFile(path);
+	if(fileHandle == NULL){
+	
+		log_msg("\nEIO\n");
+		log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
+		path, statbuf);
+		errno = EIO;
+		retstat = -1;
+		return retstat;
+		
+	}
+		
+    //modify attributes in statbuf according to the fileHandle
+	//meaningless fields will be set to 0
+	statbuf->st_dev = 0;
+	statbuf->st_ino = 0;
+	statbuf->st_mode = 0;
+	statbuf->st_nlink = 0;
+    statbuf->st_uid = fileHandle->uid;
+    statbuf->st_gid = 0;
+    statbuf->st_rdev = 0;
+    statbuf->st_size = fileHandle->fileSize;
+    statbuf->st_atime = fileHandle->time;
+    statbuf->st_mtime = 0;
+    statbuf->st_ctime = 0;
+    statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
+    statbuf->st_blocks = 0;
 
-    // find file and modify attributes in statbuf according to absolute path of parameter
+                
+    
+    
     
     log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 	  path, statbuf);
