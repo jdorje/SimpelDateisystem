@@ -7,8 +7,8 @@
 
 typedef enum {
 	
-	FILE,
-	DIR
+	IS_FILE,
+	IS_DIR
 
 } fileType;
 
@@ -26,6 +26,10 @@ typedef enum {
 
 } BOOL;
 
+typedef struct fileControlBlock fileControlBlock;
+
+typedef struct fcbNode fcbNode;
+
 typedef struct {
 
 	int magicNum; //fat32, ext2 etc.
@@ -38,16 +42,8 @@ typedef struct {
 
 } superblock;
 
-typedef struct {
 
-	fileControlBlock *fileOrDir; //current fcb in list
-	fcbNode *head;
-	fcbNode *next;
-
-} fcbNode;
-
-
-typedef struct {
+struct fileControlBlock {
 
 	char fileName[NAME_SIZE];
 	long fileSize; // number of files in directory or size of actual file
@@ -59,7 +55,17 @@ typedef struct {
 	long time; //what time was this file last accessed?
 	fcbNode *dirContents; //null if file control block is a file
 	
-} fileControlBlock;
+} ;
+
+struct fcbNode{
+
+	fileControlBlock *fileOrDir; //current fcb in list
+	fcbNode *head;
+	fcbNode *next;
+
+} ;
+
+
 
 typedef struct {
 
@@ -79,7 +85,7 @@ typedef struct {
 } iknoten;
 
 
-
+fileControlBlock *findFile(const char *filePath, fileControlBlock *curr);
 
 
 #endif
