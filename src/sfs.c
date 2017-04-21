@@ -58,6 +58,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 {
     fprintf(stderr, "in bb-init\n");
     log_msg("\nsfs_init()\n");
+
  	   
     //log_conn(conn);
     //log_fuse_context(fuse_get_context());
@@ -81,23 +82,26 @@ void *sfs_init(struct fuse_conn_info *conn)
 		else {
 			log_msg("\n Magic number does not match.\n");
 		}
-		
+
 		//check if root dir
 		if(strcmp(inodes[1].fileName, "/") == 0){
 			
 		
 		}
+
 		
 		int i = 0;
 		for(; i < sBlock.numDataBlocks; i++){
 			
 			int isSucc = block_read(i, &inodes[i]);
 			log_msg("\n Reading inodes...\n");
+
 			if(isSucc){
 				//check types of files, ex. data vs directory
 				fileControlBlock fcb = inodes[i];
 				
 				//check if dir 
+
 				if(fcb.fileType == IS_DIR){
 					
 					log_msg("\n dir found.\n");
@@ -107,6 +111,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 				else if(fcb.fileType == IS_FILE){
 				
 					log_msg("\n file found.\n");
+
 					// set the data bmap
 					if(fcb.fileSize < 1)
 						sBlock.dbmap[i] = NOT_USED;
@@ -120,7 +125,9 @@ void *sfs_init(struct fuse_conn_info *conn)
 				
 			} else {
 			
+
 				log_msg("\n Error trying to block read inode[].\n");
+
 			}
 			
 		
@@ -131,20 +138,24 @@ void *sfs_init(struct fuse_conn_info *conn)
 	// Create everything from the start
 	else {
 	
+
 		log_msg("\n Creating file system from scratch...\n");
 		sBlock.magicNum = 666;
 		block_write(0, "666 MAGICNUM");
+
 		sBlock.numInodes = 64;
 		sBlock.numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
 		sBlock.inodeStartIndex = 1; // index of the first inode struct
 		
 		
 		// set up root dir
+
 		inodes[0].fileName[0] = '/';
 		inodes[0].fileName[1] = '\0';
 		inodes[0].fileSize = 0;
 		inodes[0].parentDir = -1;
 		inodes[0].fileType = IS_DIR;
+
 		inodes[0].uid = getuid();
 		inodes[0].time = time(NULL);
 		inodes[0].dirContents = NULL;
@@ -158,8 +169,6 @@ void *sfs_init(struct fuse_conn_info *conn)
 	}
  	   
  	//use block read to 
- 	   
- 
 
     return SFS_DATA;
 }
@@ -193,11 +202,8 @@ int sfs_getattr(const char *path, struct stat *statbuf)
     // ENOTDIR (component of path prefix is not a directory), EOVERFLOW (file size in bytes or number of blocks cannot be repsented correctly)
     
        // check if path name is too long
-    if(strlen(path) > PATH_MAX){
+    if(strlen(path) > PATH_MAX)
 		log_msg("\nENAMETOOLONG\n");
-		log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
-		path, statbuf);
-    }
 
 	// find file 
     fileControlBlock *fileHandle = findFile(path, &inodes[0]);
@@ -228,8 +234,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
     statbuf->st_blocks = 0;
 
                 
-    
-    
+
     
     log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 	  path, statbuf);
@@ -241,6 +246,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 *  Finds the specific file control block for the given
 *   file path passed in the parameter
 */
+
 fileControlBlock *findFile(const char *filePath, fileControlBlock *curr){
 
 	// check for valid path length
@@ -263,6 +269,7 @@ fileControlBlock *findFile(const char *filePath, fileControlBlock *curr){
 		}
 		
 		compareChar = *(filePath + i);
+
 		i++;
 	}
 	
@@ -272,6 +279,7 @@ fileControlBlock *findFile(const char *filePath, fileControlBlock *curr){
 	int x = 0;
 	while(found == FALSE){
 	
+
 		fileControlBlock *currFCB = &inodes[x];
 		// found the file name
 		if(strcmp(currFCB->fileName, temp) == 0){
@@ -290,13 +298,17 @@ fileControlBlock *findFile(const char *filePath, fileControlBlock *curr){
 			
 			} else if(lastToken == FALSE){
 				//check if dir or not
+
 				if(currFCB->fileType == IS_DIR){
+
 			
 					// recursively search subdirectories
 					// will use the fcbNodes
 					findFile(filePath + strlen(temp), currFCB);
 					 
+
 				} else if(currFCB->fileType == IS_FILE){
+
 					//error file name in middle of path name
 					log_msg("\nENOTDIR: A component in the path prefix is not a directory.\n");
 			
@@ -316,11 +328,12 @@ fileControlBlock *findFile(const char *filePath, fileControlBlock *curr){
 			fcbNode *currNode = tempFCB->dirContents;
 			while(currNode->next != NULL){
 			
-			
+		
 				if(strcmp(temp, currNode->fileOrDir->fileName) == 0){
 					// recursively search subdirectories
 					// will use the fcbNodes
 					findFile(filePath + strlen(temp), currNode->fileOrDir);
+
 				}
 
 				currNode = currNode->next;

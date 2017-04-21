@@ -7,6 +7,7 @@
 
 typedef enum {
 	
+
 	IS_FILE,
 	IS_DIR
 
@@ -25,6 +26,7 @@ typedef enum {
 	FALSE
 
 } BOOL;
+
 
 typedef struct fileControlBlock fileControlBlock;
 
@@ -66,7 +68,6 @@ struct fcbNode{
 } ;
 
 
-
 typedef struct {
 
 	long size; //how many bytes are in this file?
@@ -86,6 +87,7 @@ typedef struct {
 
 
 fileControlBlock *findFile(const char *filePath, fileControlBlock *curr);
+
 
 
 #endif
