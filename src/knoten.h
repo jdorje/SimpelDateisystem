@@ -86,7 +86,7 @@ typedef struct {
 } iknoten;
 
 
-fileControlBlock *findFile(const char *filePath, fileControlBlock *curr);
+fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir);
 int formatDisk(superblock *sBlock);
 
 

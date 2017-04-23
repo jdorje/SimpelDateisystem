@@ -261,7 +261,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 *   file path passed in the parameter
 */
 
-fileControlBlock *findFile(const char *filePath, fileControlBlock *curr){
+fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir){
 
 	// check for valid path length
 	if(strlen(filePath) <  2)
@@ -300,9 +300,10 @@ fileControlBlock *findFile(const char *filePath, fileControlBlock *curr){
 			
 			if(lastToken == TRUE){
 				//check if dir or not
-				if(currFCB->fileType == IS_DIR){
-					log_msg("\nEIO: last path string is a directory\n");
-				} else if(currFCB->fileType == IS_FILE){
+				if(currFCB->fileType == IS_DIR && isDir == TRUE){
+					found = TRUE;
+					return currFCB;
+				} else if(currFCB->fileType == IS_FILE && isDir == FALSE){
 				
 					//end condition HERE, this is what we want
 					found = TRUE;
@@ -553,7 +554,24 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 {
     int retstat = 0;
     
-	int fuse_retVal = filler(buf, path, NULL, 0);
+	filler(buf, ".", NULL, 0);
+	filler(buf, "..", NULL, 0);
+
+	fileControlBlock *root = &inodes[0];
+	
+	fileControlBlock *directory = findFile(path, root, TRUE);
+	if(directory == NULL){
+		log_msg("\n Could not find directory using path: %s \n", path);
+		return -1;
+	}
+
+	fcbNode *curr = directory->dirContents;
+
+	while(curr != NULL){
+
+		filler(buf, curr->fileOrDir->fileName, NULL, 0);
+		curr = curr->next;
+	}
     
     return retstat;
 }
