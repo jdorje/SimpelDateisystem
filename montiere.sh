@@ -15,7 +15,7 @@ mount() {
 	TOMOUNT="$PATH_TO_MONTIERE/output.file"
 	MOUNTDIR="$PATH_TO_MONTIERE/example/mountdir"
 
-	${SFSBIN} -d -f -s ${TOMOUNT} ${MOUNTDIR}
+	gdb --args ${SFSBIN} -d -f -s ${TOMOUNT} ${MOUNTDIR}
 }
 
 unmount() {
