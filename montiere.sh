@@ -12,9 +12,10 @@ usage() {
 
 mount() {
 	SFSBIN="$PATH_TO_MONTIERE/src/sfs"
-	TOMOUNT="$PATH_TO_MONTIERE/testfsfile"
+	TOMOUNT="$PATH_TO_MONTIERE/output.file"
+	MOUNTDIR="$PATH_TO_MONTIERE/example/mountdir"
 
-	${SFSBIN} ${TOMOUNT} example/mountdir
+	${SFSBIN} -d -f -s ${TOMOUNT} ${MOUNTDIR}
 }
 
 unmount() {
