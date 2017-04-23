@@ -68,3 +68,20 @@ int block_write(const int block_num, const void *buf)
     return retstat;
 }
 
+int block_write_padded(const int block_num, const void *buf, int size)
+{
+    int retstat = 0;
+    char tmp_buffer[BLOCK_SIZE];
+    memset(tmp_buffer, '0', sizeof(tmp_buffer));
+
+    retstat = pwrite(diskfile, tmp_buffer, BLOCK_SIZE, block_num*BLOCK_SIZE);
+    if (retstat >= 0) {
+        retstat = pwrite(diskfile, buf, size, block_num*BLOCK_SIZE);
+    }
+
+    if (retstat < 0)
+    	perror("block_write failed");
+
+    return retstat;
+}
+

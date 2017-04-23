@@ -66,9 +66,9 @@ void *sfs_init(struct fuse_conn_info *conn)
     //log_fuse_context(fuse_get_context());
 	disk_open(diskFile);
  	char *buf = malloc(sizeof(char) * BLOCK_SIZE);
-	
+	sBlock = malloc(sizeof(superblock));
 
- 	int ret = block_read(0, buf);
+ 	int ret = block_read(0, sBlock);
 	log_msg("\n First block read result: %d \n", ret);
 	//check if superblock is created, if not create one
 	if( ret != 0){
@@ -79,7 +79,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 		// check if file system matches ours
 		if(sBlock->magicNum == 666){
 			log_msg("\n Magic number MATCHES OURS.\n");
-			formatDisk(sBlock);
+			
 		}
 		//convert to our file system
 		else {
@@ -94,11 +94,11 @@ void *sfs_init(struct fuse_conn_info *conn)
 		}
 
 		
-		int i = 0;
+		int i = 1;
 		for(; i < sBlock->numDataBlocks; i++){
 			
 			int isSucc = block_read(i, &inodes[i]);
-			log_msg("\n Reading inodes...\n");
+			//log_msg("\n Reading inodes...\n");
 
 			if(isSucc){
 				//check types of files, ex. data vs directory
@@ -108,13 +108,13 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 				if(fcb.fileType == IS_DIR){
 					
-					log_msg("\n dir found.\n");
-				
+					//log_msg("\n dir found.\n");
+					block_write_padded(i, &fcb, sizeof(fileControlBlock));			
 				} 
 				//check if we have file
 				else if(fcb.fileType == IS_FILE){
 				
-					log_msg("\n file found.\n");
+					//log_msg("\n file found.\n");
 
 					// set the data bmap
 					if(fcb.fileSize < 1)
@@ -122,7 +122,8 @@ void *sfs_init(struct fuse_conn_info *conn)
 					else
 						sBlock->dbmap[i] = USED;
 				
-				
+					block_write_padded(i, &fcb, sizeof(fileControlBlock));			
+
 				}
 				
 				
@@ -130,7 +131,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 			} else {
 			
 
-				log_msg("\n Error trying to block read inode[].\n");
+				//log_msg("\n Error trying to block read inode[].\n");
 
 			}
 			
@@ -156,8 +157,6 @@ int formatDisk(superblock *sBlock){
 
 		log_msg("\n Creating file system from scratch...\n");
 		sBlock->magicNum = 666;
-		block_write(0, "666 MAGICNUM");
-
 		sBlock->numInodes = 64;
 		sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
 		sBlock->inodeStartIndex = 1; // index of the first inode struct
@@ -175,6 +174,8 @@ int formatDisk(superblock *sBlock){
 		inodes[0].time = time(NULL);
 		inodes[0].dirContents = NULL;
 		
+
+		block_write_padded(0, sBlock, sizeof(superblock));
 		/* TODO: lookup these fields and assign to root dir appropriately
 		short mode; //can this file be read/written/executed?
 		char block[60]; //a set of disk pointers (15 total)
