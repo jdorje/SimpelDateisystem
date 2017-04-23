@@ -53,7 +53,9 @@
  //TODO ibitmap (4KB) and data bitmap (4KB)
  
 fileControlBlock inodes[64];
- 
+char *diskFile;
+superblock *sBlock;
+
 void *sfs_init(struct fuse_conn_info *conn)
 {
     fprintf(stderr, "in bb-init\n");
@@ -62,25 +64,27 @@ void *sfs_init(struct fuse_conn_info *conn)
  	   
     //log_conn(conn);
     //log_fuse_context(fuse_get_context());
-	disk_open(SFS_DATA->diskfile);
+	disk_open(diskFile);
  	char *buf = malloc(sizeof(char) * BLOCK_SIZE);
 	
- 	superblock sBlock;
+
  	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
 	//check if superblock is created, if not create one
 	if( ret != 0){
 	
 		log_msg("\n Superblock loaded...\n");
-		memcpy(&sBlock, buf, ret);
+		memcpy(sBlock, buf, ret);
 		
 		// check if file system matches ours
-		if(sBlock.magicNum == 666){
+		if(sBlock->magicNum == 666){
 			log_msg("\n Magic number MATCHES OURS.\n");
+			formatDisk(sBlock);
 		}
 		//convert to our file system
 		else {
 			log_msg("\n Magic number does not match.\n");
+			formatDisk(sBlock); //NEED TO CHANGE METHOD TO INCLUDE FLAG TO CONVERT TO OUR FS
 		}
 
 		//check if root dir
@@ -91,7 +95,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 		
 		int i = 0;
-		for(; i < sBlock.numDataBlocks; i++){
+		for(; i < sBlock->numDataBlocks; i++){
 			
 			int isSucc = block_read(i, &inodes[i]);
 			log_msg("\n Reading inodes...\n");
@@ -114,9 +118,9 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 					// set the data bmap
 					if(fcb.fileSize < 1)
-						sBlock.dbmap[i] = NOT_USED;
+						sBlock->dbmap[i] = NOT_USED;
 					else
-						sBlock.dbmap[i] = USED;
+						sBlock->dbmap[i] = USED;
 				
 				
 				}
@@ -138,14 +142,25 @@ void *sfs_init(struct fuse_conn_info *conn)
 	// Create everything from the start
 	else {
 	
+		formatDisk(sBlock);
+
+	}
+ 	   
+ 	//use block read to 
+
+    return SFS_DATA;
+}
+
+int formatDisk(superblock *sBlock){
+
 
 		log_msg("\n Creating file system from scratch...\n");
-		sBlock.magicNum = 666;
+		sBlock->magicNum = 666;
 		block_write(0, "666 MAGICNUM");
 
-		sBlock.numInodes = 64;
-		sBlock.numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
-		sBlock.inodeStartIndex = 1; // index of the first inode struct
+		sBlock->numInodes = 64;
+		sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
+		sBlock->inodeStartIndex = 1; // index of the first inode struct
 		
 		
 		// set up root dir
@@ -166,12 +181,10 @@ void *sfs_init(struct fuse_conn_info *conn)
 		long time; //what time was this file last accessed?
 		*/
 	
-	}
- 	   
- 	//use block read to 
 
-    return SFS_DATA;
+
 }
+
 
 /**
  * Clean up filesystem
@@ -325,7 +338,10 @@ fileControlBlock *findFile(const char *filePath, fileControlBlock *curr){
 		
 			
 			fileControlBlock *tempFCB = curr;
-			fcbNode *currNode = tempFCB->dirContents;
+
+			fcbNode *currNode = tempFCB->dirContents; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
+							
+
 			while(currNode->next != NULL){
 			
 		
@@ -596,6 +612,7 @@ int main(int argc, char *argv[])
 
     // Pull the diskfile and save it in internal data
     sfs_data->diskfile = argv[argc-2];
+	diskFile = argv[argc - 2];
     argv[argc-2] = argv[argc-1];
     argv[argc-1] = NULL;
     argc--;

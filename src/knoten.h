@@ -55,7 +55,7 @@ struct fileControlBlock {
 	short uid; //who owns this file?
 	char block[60]; //a set of disk pointers (15 total)
 	long time; //what time was this file last accessed?
-	fcbNode *dirContents; //null if file control block is a file
+	fcbNode *dirContents; //the file or directory linked list structure
 	
 } ;
 
@@ -87,7 +87,7 @@ typedef struct {
 
 
 fileControlBlock *findFile(const char *filePath, fileControlBlock *curr);
-
+int formatDisk(superblock *sBlock);
 
 
 #endif
