@@ -49,7 +49,7 @@ struct fileControlBlock {
 
 	char fileName[NAME_SIZE];
 	long fileSize; // number of files in directory or size of actual file
-	int parentDir;
+	char parentDir[NAME_SIZE];
 	fileType fileType;
 	short mode; //can this file be read/written/executed?
 	short uid; //who owns this file?

@@ -167,7 +167,7 @@ int formatDisk(superblock *sBlock){
 		inodes[0].fileName[0] = '/';
 		inodes[0].fileName[1] = '\0';
 		inodes[0].fileSize = 0;
-		inodes[0].parentDir = -1;
+		inodes[0].parentDir[0] = '\0';
 		inodes[0].fileType = IS_DIR;
 
 		inodes[0].uid = getuid();
@@ -407,6 +407,81 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     int retstat = 0;
     log_msg("\nsfs_create(path=\"%s\", mode=0%03o, fi=0x%08x)\n",
 	    path, mode, fi);
+
+    // find inode with the specific path
+    // if it does not exist, create an inode for it
+    fileControlBlock *root = &inodes[0];
+    if(root == NULL){
+    	log_msg("\n ROOT node is null! \n");
+    	return;
+    }
+
+    fileControlBlock *inode = findFileOrDir(path, root, FALSE);
+
+    if(inode == NULL){
+
+    	int i = 0;
+    	while(i < sBlock->numDataBlocks){
+
+    		// free inode space found!
+    		if(inodes[i].fileName != '\0'){
+
+    			memcpy(&inodes[i].fileName, path, strlen(path));
+				inodes[i].fileSize = 0; //no data yet, still unknown
+
+				//parent dir is string between previous set of slashes
+				int firstSlash;
+				int secondSlash;
+				char curr = *path;
+				int numSlashesFound = 0;
+				int index = 0;
+				while(numSlashesFound != 2){
+
+					if(curr == '/' && numSlashesFound == 0){
+						numSlashesFound++;
+						firstSlash = index;
+					}
+					else if(curr == '/' && numSlashesFound == 1){
+						numSlashesFound++;
+						secondSlash = index;
+					}
+
+					curr = *(path + index);
+					index++;
+
+				}
+
+				// accounts for slashes
+				memcpy(&inodes[i].parentDir, (path + firstSlash + 1), (secondSlash - 1) );
+
+				//handle linked list structure
+				fcbNode *prev = inodes[i - 1].dirContents;
+				fcbNode *currNode = inodes[i].dirContents;
+				prev->next = currNode;
+				currNode->fileOrDir = &inodes[i];
+				currNode->next = NULL;
+				//do we need to set head here!?
+
+				//set rest of inode fields
+				inodes[i].fileType = IS_FILE;
+				inodes[i].uid = getuid();
+				inodes[i].time = time(NULL);
+				inodes[i].dirContents = currNode;
+
+    		}
+
+
+    	}
+
+
+
+    } 
+    // open the inode
+    else {
+    	//TODO: how to open a file??
+
+
+    }
     
     
     return retstat;
