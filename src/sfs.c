@@ -65,25 +65,25 @@ void *sfs_init(struct fuse_conn_info *conn)
     //log_conn(conn);
     //log_fuse_context(fuse_get_context());
 	disk_open(diskFile);
- 	char *buf = malloc(sizeof(char) * BLOCK_SIZE);
+ 	char buf[BLOCK_SIZE];
 	sBlock = malloc(sizeof(superblock));
 
- 	int ret = block_read(0, sBlock);
+ 	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
 	//check if superblock is created, if not create one
 	if( ret != 0){
 	
 		log_msg("\n Superblock loaded...\n");
-		memcpy(sBlock, buf, ret);
-		
+		memcpy(sBlock, buf, BLOCK_SIZE);
 		// check if file system matches ours
 		if(sBlock->magicNum == 666){
 			log_msg("\n Magic number MATCHES OURS.\n");
-			
+			formatDisk(sBlock);
 		}
 		//convert to our file system
 		else {
 			log_msg("\n Magic number does not match.\n");
+			log_msg("\n The number received was: %d\n", sBlock->magicNum);
 			formatDisk(sBlock); //NEED TO CHANGE METHOD TO INCLUDE FLAG TO CONVERT TO OUR FS
 		}
 
@@ -95,7 +95,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 		
 		int i = 1;
-		for(; i < sBlock->numDataBlocks; i++){
+		for(; i < 20; i++){
 			
 			int isSucc = block_read(i, &inodes[i]);
 			//log_msg("\n Reading inodes...\n");
@@ -148,7 +148,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 	}
  	   
  	//use block read to 
-
+	showInodeNames();
     return SFS_DATA;
 }
 
@@ -174,8 +174,12 @@ int formatDisk(superblock *sBlock){
 		inodes[0].time = time(NULL);
 		inodes[0].dirContents = NULL;
 		
+		//TODO: FORMAT ALL INODES HERE!! THE ENTIRE ARRAY
+
+		//********************************
 
 		block_write_padded(0, sBlock, sizeof(superblock));
+		block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
 		/* TODO: lookup these fields and assign to root dir appropriately
 		short mode; //can this file be read/written/executed?
 		char block[60]; //a set of disk pointers (15 total)
@@ -210,42 +214,57 @@ int sfs_getattr(const char *path, struct stat *statbuf)
     int retstat = 0;
     char fpath[PATH_MAX];
     
-   // TODO ACCOUNT FOR THE FOLLOWING ERRORS:
-    // EACCES (permission denied), EIO (error while reading), ELOOP (loop exists in symbolic links),
-    // ENAMETOOLONG (length of path argument is too long), ENOENT (component of path does not exist or empty 
-    // ENOTDIR (component of path prefix is not a directory), EOVERFLOW (file size in bytes or number of blocks cannot be repsented correctly)
-    
        // check if path name is too long
     if(strlen(path) > PATH_MAX)
 		log_msg("\nENAMETOOLONG\n");
 
+	if(strcmp(path, "/.Trash") == 0 ||
+		strcmp(path, "/.Trash-82610") == 0){
+		statbuf->st_dev = 0;
+		statbuf->st_ino = 0;
+		statbuf->st_mode = inodes[0].mode;
+		statbuf->st_nlink = 0;
+		statbuf->st_uid = inodes[0].uid;
+		statbuf->st_gid = getgid();
+		statbuf->st_rdev = 0;
+		statbuf->st_size = inodes[0].fileSize;
+		statbuf->st_atime = inodes[0].time;
+		statbuf->st_mtime = 0;
+		statbuf->st_ctime = 0;
+		statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
+		statbuf->st_blocks = 0;
+
+	}
+			
+
 	// find file 
-    fileControlBlock *fileHandle = findFile(path, &inodes[0]);
+    fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
 	if(fileHandle == NULL){
 	
 		log_msg("\nEIO\n");
 		log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 		path, statbuf);
-		retstat = -EIO;
+		retstat = -1;
+		errno = ENOENT;
 		return retstat;
 		
 	}
-		
-    //modify attributes in statbuf according to the fileHandle
+
+	//modify attributes in statbuf according to the fileHandle
 	//meaningless fields will be set to 0
 	statbuf->st_dev = 0;
 	statbuf->st_ino = 0;
 	statbuf->st_mode = 0;
 	statbuf->st_nlink = 0;
-    statbuf->st_uid = fileHandle->uid;
-    statbuf->st_gid = 0;
-    statbuf->st_rdev = 0;
-    statbuf->st_size = fileHandle->fileSize;
-    statbuf->st_atime = fileHandle->time;
-    statbuf->st_mtime = 0;
-    statbuf->st_ctime = 0;
-    statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
-    statbuf->st_blocks = 0;
+	statbuf->st_uid = fileHandle->uid;
+	statbuf->st_gid = getgid();
+	statbuf->st_rdev = 0;
+	statbuf->st_size = fileHandle->fileSize;
+	statbuf->st_atime = fileHandle->time;
+	statbuf->st_mtime = 0;
+	statbuf->st_ctime = 0;
+	statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
+	statbuf->st_blocks = 0;
 
                 
 
@@ -273,25 +292,26 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 	char *temp = malloc(sizeof(char) * strlen(filePath));
 	//add one to account for forward slash
 	char compareChar = *(filePath + 1);
-	int i = 0;
+	int offset = 1;
 	
-	while(compareChar == '/'){
+	while(compareChar != '/'){
 	
 		if(compareChar == '\0'){
 			lastToken = TRUE;
 			break;
 		}
 		
-		compareChar = *(filePath + i);
+		offset++;
+		compareChar = *(filePath + offset);
 
-		i++;
+
 	}
 	
 	//copy temp name to temp string
-	memcpy(temp, filePath, i);
+	memcpy(temp, filePath, sizeof(char) * offset);
 	
 	int x = 0;
-	while(found == FALSE){
+	while(found == FALSE && x < sBlock->numInodes){
 	
 
 		fileControlBlock *currFCB = &inodes[x];
@@ -319,7 +339,7 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 			
 					// recursively search subdirectories
 					// will use the fcbNodes
-					findFile(filePath + strlen(temp), currFCB);
+					findFileOrDir(filePath + strlen(temp), currFCB, isDir);
 					 
 
 				} else if(currFCB->fileType == IS_FILE){
@@ -344,13 +364,13 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 			fcbNode *currNode = tempFCB->dirContents; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
 							
 
-			while(currNode->next != NULL){
+			while(currNode != NULL){
 			
 		
 				if(strcmp(temp, currNode->fileOrDir->fileName) == 0){
 					// recursively search subdirectories
 					// will use the fcbNodes
-					findFile(filePath + strlen(temp), currNode->fileOrDir);
+					findFileOrDir(filePath + strlen(temp), currNode->fileOrDir, isDir);
 
 				}
 
@@ -559,7 +579,7 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 
 	fileControlBlock *root = &inodes[0];
 	
-	fileControlBlock *directory = findFile(path, root, TRUE);
+	fileControlBlock *directory = findFileOrDir(path, root, TRUE);
 	if(directory == NULL){
 		log_msg("\n Could not find directory using path: %s \n", path);
 		return -1;
@@ -576,6 +596,14 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
     return retstat;
 }
 
+
+void showInodeNames(){
+
+	int i = 0;
+	for(i; i < 64; i++){
+		log_msg("Inode Name: %s\n", inodes[i].fileName);
+	}
+}
 /** Release directory
  *
  * Introduced in version 2.3

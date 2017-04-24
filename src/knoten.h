@@ -88,6 +88,7 @@ typedef struct {
 
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir);
 int formatDisk(superblock *sBlock);
+void showInodeNames();
 
 
 #endif
