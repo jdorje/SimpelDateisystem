@@ -1,9 +1,9 @@
 /*
-  Simple File System
+   Simple File System
 
-  This code is derived from function prototypes found /usr/include/fuse/fuse.h
-  Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
-  His code is licensed under the LGPLv2.
+   This code is derived from function prototypes found /usr/include/fuse/fuse.h
+   Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+   His code is licensed under the LGPLv2.
 
 */
 
@@ -48,31 +48,31 @@
  * Introduced in version 2.3
  * Changed in version 2.6
  */
- 
- //TODO superblock (4KB)
- //TODO ibitmap (4KB) and data bitmap (4KB)
- 
+
+//TODO superblock (4KB)
+//TODO ibitmap (4KB) and data bitmap (4KB)
+
 fileControlBlock inodes[64];
 char *diskFile;
 superblock *sBlock;
 
 void *sfs_init(struct fuse_conn_info *conn)
 {
-    fprintf(stderr, "in bb-init\n");
-    log_msg("\nsfs_init()\n");
+	fprintf(stderr, "in bb-init\n");
+	log_msg("\nsfs_init()\n");
 
- 	   
-    //log_conn(conn);
-    //log_fuse_context(fuse_get_context());
+
+	//log_conn(conn);
+	//log_fuse_context(fuse_get_context());
 	disk_open(diskFile);
- 	char buf[BLOCK_SIZE];
+	char buf[BLOCK_SIZE];
 	sBlock = malloc(sizeof(superblock));
 
- 	int ret = block_read(0, buf);
+	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
 	//check if superblock is created, if not create one
 	if( ret != 0){
-	
+
 		log_msg("\n Superblock loaded...\n");
 		memcpy(sBlock, buf, BLOCK_SIZE);
 		// check if file system matches ours
@@ -89,31 +89,31 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 		//check if root dir
 		if(strcmp(inodes[1].fileName, "/") == 0){
-			
-		
+
+
 		}
 
-		
+
 		int i = 1;
 		for(; i < 20; i++){
-			
+
 			int isSucc = block_read(i, &inodes[i]);
 			//log_msg("\n Reading inodes...\n");
 
 			if(isSucc){
 				//check types of files, ex. data vs directory
 				fileControlBlock fcb = inodes[i];
-				
+
 				//check if dir 
 
 				if(fcb.fileType == IS_DIR){
-					
+
 					//log_msg("\n dir found.\n");
 					block_write_padded(i, &fcb, sizeof(fileControlBlock));			
 				} 
 				//check if we have file
 				else if(fcb.fileType == IS_FILE){
-				
+
 					//log_msg("\n file found.\n");
 
 					// set the data bmap
@@ -121,73 +121,69 @@ void *sfs_init(struct fuse_conn_info *conn)
 						sBlock->dbmap[i] = NOT_USED;
 					else
 						sBlock->dbmap[i] = USED;
-				
+
 					block_write_padded(i, &fcb, sizeof(fileControlBlock));			
 
 				}
-				
-				
-				
+
+
+
 			} else {
-			
+
 
 				//log_msg("\n Error trying to block read inode[].\n");
 
 			}
-			
-		
+
+
 		}
-		
-		
+
+
 	} 
 	// Create everything from the start
 	else {
-	
+
 		formatDisk(sBlock);
 
 	}
- 	   
- 	//use block read to 
+
+	//use block read to 
 	showInodeNames();
-    return SFS_DATA;
+	return SFS_DATA;
 }
 
-int formatDisk(superblock *sBlock){
+int formatDisk(superblock *sBlock)
+{
+	log_msg("\n Creating file system from scratch...\n");
+	sBlock->magicNum = 666;
+	sBlock->numInodes = 64;
+	sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
+	sBlock->inodeStartIndex = 1; // index of the first inode struct
 
 
-		log_msg("\n Creating file system from scratch...\n");
-		sBlock->magicNum = 666;
-		sBlock->numInodes = 64;
-		sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
-		sBlock->inodeStartIndex = 1; // index of the first inode struct
-		
-		
-		// set up root dir
+	// set up root dir
 
-		inodes[0].fileName[0] = '/';
-		inodes[0].fileName[1] = '\0';
-		inodes[0].fileSize = 0;
-		inodes[0].parentDir[0] = '\0';
-		inodes[0].fileType = IS_DIR;
+	inodes[0].fileName[0] = '/';
+	inodes[0].fileName[1] = '\0';
+	inodes[0].fileSize = 0;
+	inodes[0].parentDir[0] = '\0';
+	inodes[0].fileType = IS_DIR;
 
-		inodes[0].uid = getuid();
-		inodes[0].time = time(NULL);
-		inodes[0].dirContents = NULL;
-		
-		//TODO: FORMAT ALL INODES HERE!! THE ENTIRE ARRAY
+	inodes[0].uid = getuid();
+	inodes[0].time = time(NULL);
+	inodes[0].dirContents = NULL;
 
-		//********************************
+	//TODO: FORMAT ALL INODES HERE!! THE ENTIRE ARRAY
 
-		block_write_padded(0, sBlock, sizeof(superblock));
-		block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
-		/* TODO: lookup these fields and assign to root dir appropriately
-		short mode; //can this file be read/written/executed?
-		char block[60]; //a set of disk pointers (15 total)
-		long time; //what time was this file last accessed?
-		*/
-	
+	//********************************
 
-
+	block_write_padded(0, sBlock, sizeof(superblock));
+	block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
+	/* TODO: lookup these fields and assign to root dir appropriately
+	   short mode; //can this file be read/written/executed?
+	   char block[60]; //a set of disk pointers (15 total)
+	   long time; //what time was this file last accessed?
+	   */
 }
 
 
@@ -200,7 +196,7 @@ int formatDisk(superblock *sBlock){
  */
 void sfs_destroy(void *userdata)
 {
-    log_msg("\nsfs_destroy(userdata=0x%08x)\n", userdata);
+	log_msg("\nsfs_destroy(userdata=0x%08x)\n", userdata);
 }
 
 /** Get file attributes.
@@ -211,15 +207,19 @@ void sfs_destroy(void *userdata)
  */
 int sfs_getattr(const char *path, struct stat *statbuf)
 {
-    int retstat = 0;
-    char fpath[PATH_MAX];
-    
-       // check if path name is too long
-    if(strlen(path) > PATH_MAX)
+	int retstat = 0;
+	char fpath[PATH_MAX];
+
+	// check if path name is too long
+	if(strlen(path) > PATH_MAX)
 		log_msg("\nENAMETOOLONG\n");
 
 	if(strcmp(path, "/.Trash") == 0 ||
-		strcmp(path, "/.Trash-82610") == 0){
+			(
+			 strncmp(path, "/.Trash-", 8) == 0) &&
+			(strlen(path) == 13) // It is /.Trash-XXXXX
+	  )
+	{
 		statbuf->st_dev = 0;
 		statbuf->st_ino = 0;
 		statbuf->st_mode = inodes[0].mode;
@@ -235,19 +235,19 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		statbuf->st_blocks = 0;
 
 	}
-			
+
 
 	// find file 
-    fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
+	fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
 	if(fileHandle == NULL){
-	
+
 		log_msg("\nEIO\n");
 		log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
-		path, statbuf);
+				path, statbuf);
 		retstat = -1;
 		errno = ENOENT;
 		return retstat;
-		
+
 	}
 
 	//modify attributes in statbuf according to the fileHandle
@@ -266,19 +266,19 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 	statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
 	statbuf->st_blocks = 0;
 
-                
 
-    
-    log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
-	  path, statbuf);
-    
-    return retstat;	
+
+
+	log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
+			path, statbuf);
+
+	return retstat;	
 }
 
 /*
-*  Finds the specific file control block for the given
-*   file path passed in the parameter
-*/
+ *  Finds the specific file control block for the given
+ *   file path passed in the parameter
+ */
 
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir){
 
@@ -286,87 +286,87 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 	if(strlen(filePath) <  2)
 		log_msg("\nEIO\n");
 
-   	
+
 	BOOL found = FALSE;
 	BOOL lastToken = FALSE;
 	char *temp = malloc(sizeof(char) * strlen(filePath));
 	//add one to account for forward slash
 	char compareChar = *(filePath + 1);
 	int offset = 1;
-	
+
 	while(compareChar != '/'){
-	
+
 		if(compareChar == '\0'){
 			lastToken = TRUE;
 			break;
 		}
-		
+
 		offset++;
 		compareChar = *(filePath + offset);
 
 
 	}
-	
+
 	//copy temp name to temp string
 	memcpy(temp, filePath, sizeof(char) * offset);
-	
+
 	int x = 0;
 	while(found == FALSE && x < sBlock->numInodes){
-	
+
 
 		fileControlBlock *currFCB = &inodes[x];
 		// found the file name
 		if(strcmp(currFCB->fileName, temp) == 0){
-			
+
 			if(lastToken == TRUE){
 				//check if dir or not
 				if(currFCB->fileType == IS_DIR && isDir == TRUE){
 					found = TRUE;
 					return currFCB;
 				} else if(currFCB->fileType == IS_FILE && isDir == FALSE){
-				
+
 					//end condition HERE, this is what we want
 					found = TRUE;
 					return currFCB;
-			
+
 				}	
-			
+
 			} else if(lastToken == FALSE){
 				//check if dir or not
 
 				if(currFCB->fileType == IS_DIR){
 
-			
+
 					// recursively search subdirectories
 					// will use the fcbNodes
 					findFileOrDir(filePath + strlen(temp), currFCB, isDir);
-					 
+
 
 				} else if(currFCB->fileType == IS_FILE){
 
 					//error file name in middle of path name
 					log_msg("\nENOTDIR: A component in the path prefix is not a directory.\n");
-			
+
 				}	
-			
-			
-			
+
+
+
 			}
 
-			
+
 		} 
 		// temp name did not match, search current directory
 		else {
-		
-			
+
+
 			fileControlBlock *tempFCB = curr;
 
 			fcbNode *currNode = tempFCB->dirContents; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
-							
+
 
 			while(currNode != NULL){
-			
-		
+
+
 				if(strcmp(temp, currNode->fileOrDir->fileName) == 0){
 					// recursively search subdirectories
 					// will use the fcbNodes
@@ -376,18 +376,29 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 
 				currNode = currNode->next;
 			}
-		
-		
-		
+
+
+
 		}
-			
-	
+
+
 		x++;
 	}
-	
+
 	log_msg("\nENOENT: Component does not exist or is empty string.\n");
 	return NULL;
 
+}
+
+fileControlBlock *findRootOrDieTrying()
+{
+	fileControlBlock *root = &inodes[0];
+	if (root == NULL) {
+		log_msg("\n ROOT is NULL\n");
+		return NULL;
+	}
+
+	return root;
 }
 
 /**
@@ -404,97 +415,109 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
  */
 int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-    int retstat = 0;
-    log_msg("\nsfs_create(path=\"%s\", mode=0%03o, fi=0x%08x)\n",
-	    path, mode, fi);
+	int retstat = 0;
+	log_msg("\nsfs_create(path=\"%s\", mode=0%03o, fi=0x%08x)\n",
+			path, mode, fi);
 
-    // find inode with the specific path
-    // if it does not exist, create an inode for it
-    fileControlBlock *root = &inodes[0];
-    if(root == NULL){
-    	log_msg("\n ROOT node is null! \n");
-    	return;
-    }
+	// find inode with the specific path
+	// if it does not exist, create an inode for it
+	fileControlBlock *root = findRootOrDieTrying();
+	if (root != NULL) {
 
-    fileControlBlock *inode = findFileOrDir(path, root, FALSE);
+		fileControlBlock *inode = findFileOrDir(path, root, FALSE);
 
-    if(inode == NULL){
+		if(inode == NULL){
 
-    	int i = 0;
-    	while(i < sBlock->numDataBlocks){
+			int i = 0;
+			while(i < sBlock->numDataBlocks){
 
-    		// free inode space found!
-    		if(inodes[i].fileName != '\0'){
+				// free inode space found!
+				if(inodes[i].fileName != '\0'){
 
-    			memcpy(&inodes[i].fileName, path, strlen(path));
-				inodes[i].fileSize = 0; //no data yet, still unknown
+					memcpy(&inodes[i].fileName, path, strlen(path));
+					inodes[i].fileSize = 0; //no data yet, still unknown
 
-				//parent dir is string between previous set of slashes
-				int firstSlash;
-				int secondSlash;
-				char curr = *path;
-				int numSlashesFound = 0;
-				int index = 0;
-				while(numSlashesFound != 2){
+					//parent dir is string between previous set of slashes
+					int firstSlash;
+					int secondSlash;
+					char curr = *path;
+					int numSlashesFound = 0;
+					int index = 0;
+					while(numSlashesFound != 2){
 
-					if(curr == '/' && numSlashesFound == 0){
-						numSlashesFound++;
-						firstSlash = index;
+						if(curr == '/' && numSlashesFound == 0){
+							numSlashesFound++;
+							firstSlash = index;
+						}
+						else if(curr == '/' && numSlashesFound == 1){
+							numSlashesFound++;
+							secondSlash = index;
+						}
+
+						curr = *(path + index);
+						index++;
+
 					}
-					else if(curr == '/' && numSlashesFound == 1){
-						numSlashesFound++;
-						secondSlash = index;
-					}
 
-					curr = *(path + index);
-					index++;
+					// accounts for slashes
+					memcpy(&inodes[i].parentDir, (path + firstSlash + 1), (secondSlash - 1) );
+
+					//handle linked list structure
+					fcbNode *prev = inodes[i - 1].dirContents;
+					fcbNode *currNode = inodes[i].dirContents;
+					prev->next = currNode;
+					currNode->fileOrDir = &inodes[i];
+					currNode->next = NULL;
+					//do we need to set head here!?
+
+					//set rest of inode fields
+					inodes[i].fileType = IS_FILE;
+					inodes[i].uid = getuid();
+					inodes[i].time = time(NULL);
+					inodes[i].dirContents = currNode;
 
 				}
 
-				// accounts for slashes
-				memcpy(&inodes[i].parentDir, (path + firstSlash + 1), (secondSlash - 1) );
 
-				//handle linked list structure
-				fcbNode *prev = inodes[i - 1].dirContents;
-				fcbNode *currNode = inodes[i].dirContents;
-				prev->next = currNode;
-				currNode->fileOrDir = &inodes[i];
-				currNode->next = NULL;
-				//do we need to set head here!?
-
-				//set rest of inode fields
-				inodes[i].fileType = IS_FILE;
-				inodes[i].uid = getuid();
-				inodes[i].time = time(NULL);
-				inodes[i].dirContents = currNode;
-
-    		}
-
-
-    	}
+			}
 
 
 
-    } 
-    // open the inode
-    else {
-    	//TODO: how to open a file??
+		} 
+		// open the inode
+		else {
+			//TODO: how to open a file??
 
 
-    }
-    
-    
-    return retstat;
+		}
+	}
+
+	return retstat;
 }
 
 /** Remove a file */
 int sfs_unlink(const char *path)
 {
-    int retstat = 0;
-    log_msg("sfs_unlink(path=\"%s\")\n", path);
+	int retstat = 0;
+	log_msg("sfs_unlink(path=\"%s\")\n", path);
 
-    
-    return retstat;
+	fileControlBlock *root = findRootOrDieTrying();
+	if(root != NULL) {
+		fileControlBlock *fcbToUnlink = findFileOrDir(path, root, FALSE);
+		if (fcbToUnlink != NULL) {
+			//free block data.
+			//update the inode bitmap entry
+		} else {
+			log_msg("unable to find file you want to remove");
+			retstat = -1;
+			errno = ENOENT;
+		}
+	} else {
+		errno = EIO;
+		retstat = -1;
+	}
+
+	return retstat;
 }
 
 /** File open operation
@@ -509,12 +532,12 @@ int sfs_unlink(const char *path)
  */
 int sfs_open(const char *path, struct fuse_file_info *fi)
 {
-    int retstat = 0;
-    log_msg("\nsfs_open(path\"%s\", fi=0x%08x)\n",
-	    path, fi);
+	int retstat = 0;
+	log_msg("\nsfs_open(path\"%s\", fi=0x%08x)\n",
+			path, fi);
 
-    
-    return retstat;
+
+	return retstat;
 }
 
 /** Release an open file
@@ -533,12 +556,12 @@ int sfs_open(const char *path, struct fuse_file_info *fi)
  */
 int sfs_release(const char *path, struct fuse_file_info *fi)
 {
-    int retstat = 0;
-    log_msg("\nsfs_release(path=\"%s\", fi=0x%08x)\n",
-	  path, fi);
-    
+	int retstat = 0;
+	log_msg("\nsfs_release(path=\"%s\", fi=0x%08x)\n",
+			path, fi);
 
-    return retstat;
+
+	return retstat;
 }
 
 /** Read data from an open file
@@ -554,12 +577,12 @@ int sfs_release(const char *path, struct fuse_file_info *fi)
  */
 int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-    int retstat = 0;
-    log_msg("\nsfs_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
-	    path, buf, size, offset, fi);
+	int retstat = 0;
+	log_msg("\nsfs_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
+			path, buf, size, offset, fi);
 
-   
-    return retstat;
+
+	return retstat;
 }
 
 /** Write data to an open file
@@ -571,38 +594,38 @@ int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
  * Changed in version 2.2
  */
 int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
-	     struct fuse_file_info *fi)
+		struct fuse_file_info *fi)
 {
-    int retstat = 0;
-    log_msg("\nsfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
-	    path, buf, size, offset, fi);
-    
-    
-    return retstat;
+	int retstat = 0;
+	log_msg("\nsfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
+			path, buf, size, offset, fi);
+
+
+	return retstat;
 }
 
 
 /** Create a directory */
 int sfs_mkdir(const char *path, mode_t mode)
 {
-    int retstat = 0;
-    log_msg("\nsfs_mkdir(path=\"%s\", mode=0%3o)\n",
-	    path, mode);
-   
-    
-    return retstat;
+	int retstat = 0;
+	log_msg("\nsfs_mkdir(path=\"%s\", mode=0%3o)\n",
+			path, mode);
+
+
+	return retstat;
 }
 
 
 /** Remove a directory */
 int sfs_rmdir(const char *path)
 {
-    int retstat = 0;
-    log_msg("sfs_rmdir(path=\"%s\")\n",
-	    path);
-    
-    
-    return retstat;
+	int retstat = 0;
+	log_msg("sfs_rmdir(path=\"%s\")\n",
+			path);
+
+
+	return retstat;
 }
 
 
@@ -615,12 +638,12 @@ int sfs_rmdir(const char *path)
  */
 int sfs_opendir(const char *path, struct fuse_file_info *fi)
 {
-    int retstat = 0;
-    log_msg("\nsfs_opendir(path=\"%s\", fi=0x%08x)\n",
-	  path, fi);
-    
-    
-    return retstat;
+	int retstat = 0;
+	log_msg("\nsfs_opendir(path=\"%s\", fi=0x%08x)\n",
+			path, fi);
+
+
+	return retstat;
 }
 
 /** Read directory
@@ -645,15 +668,15 @@ int sfs_opendir(const char *path, struct fuse_file_info *fi)
  * Introduced in version 2.3
  */
 int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
-	       struct fuse_file_info *fi)
+		struct fuse_file_info *fi)
 {
-    int retstat = 0;
-    
+	int retstat = 0;
+
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
 	fileControlBlock *root = &inodes[0];
-	
+
 	fileControlBlock *directory = findFileOrDir(path, root, TRUE);
 	if(directory == NULL){
 		log_msg("\n Could not find directory using path: %s \n", path);
@@ -667,8 +690,8 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 		filler(buf, curr->fileOrDir->fileName, NULL, 0);
 		curr = curr->next;
 	}
-    
-    return retstat;
+
+	return retstat;
 }
 
 
@@ -685,66 +708,66 @@ void showInodeNames(){
  */
 int sfs_releasedir(const char *path, struct fuse_file_info *fi)
 {
-    int retstat = 0;
+	int retstat = 0;
 
-    
-    return retstat;
+
+	return retstat;
 }
 
 struct fuse_operations sfs_oper = {
-  .init = sfs_init,
-  .destroy = sfs_destroy,
+	.init = sfs_init,
+	.destroy = sfs_destroy,
 
-  .getattr = sfs_getattr,
-  .create = sfs_create,
-  .unlink = sfs_unlink,
-  .open = sfs_open,
-  .release = sfs_release,
-  .read = sfs_read,
-  .write = sfs_write,
+	.getattr = sfs_getattr,
+	.create = sfs_create,
+	.unlink = sfs_unlink,
+	.open = sfs_open,
+	.release = sfs_release,
+	.read = sfs_read,
+	.write = sfs_write,
 
-  .rmdir = sfs_rmdir,
-  .mkdir = sfs_mkdir,
+	.rmdir = sfs_rmdir,
+	.mkdir = sfs_mkdir,
 
-  .opendir = sfs_opendir,
-  .readdir = sfs_readdir,
-  .releasedir = sfs_releasedir
+	.opendir = sfs_opendir,
+	.readdir = sfs_readdir,
+	.releasedir = sfs_releasedir
 };
 
 void sfs_usage()
 {
-    fprintf(stderr, "usage:  sfs [FUSE and mount options] diskFile mountPoint\n");
-    abort();
+	fprintf(stderr, "usage:  sfs [FUSE and mount options] diskFile mountPoint\n");
+	abort();
 }
 
 int main(int argc, char *argv[])
 {
-    int fuse_stat;
-    struct sfs_state *sfs_data;
-    
-    // sanity checking on the command line
-    if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
-	sfs_usage();
+	int fuse_stat;
+	struct sfs_state *sfs_data;
 
-    sfs_data = malloc(sizeof(struct sfs_state));
-    if (sfs_data == NULL) {
-	perror("main calloc");
-	abort();
-    }
+	// sanity checking on the command line
+	if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
+		sfs_usage();
 
-    // Pull the diskfile and save it in internal data
-    sfs_data->diskfile = argv[argc-2];
+	sfs_data = malloc(sizeof(struct sfs_state));
+	if (sfs_data == NULL) {
+		perror("main calloc");
+		abort();
+	}
+
+	// Pull the diskfile and save it in internal data
+	sfs_data->diskfile = argv[argc-2];
 	diskFile = argv[argc - 2];
-    argv[argc-2] = argv[argc-1];
-    argv[argc-1] = NULL;
-    argc--;
-    
-    sfs_data->logfile = log_open();
-    
-    // turn over control to fuse
-    fprintf(stderr, "about to call fuse_main, %s \n", sfs_data->diskfile);
-    fuse_stat = fuse_main(argc, argv, &sfs_oper, sfs_data);
-    fprintf(stderr, "fuse_main returned %d\n", fuse_stat);
-    
-    return fuse_stat;
+	argv[argc-2] = argv[argc-1];
+	argv[argc-1] = NULL;
+	argc--;
+
+	sfs_data->logfile = log_open();
+
+	// turn over control to fuse
+	fprintf(stderr, "about to call fuse_main, %s \n", sfs_data->diskfile);
+	fuse_stat = fuse_main(argc, argv, &sfs_oper, sfs_data);
+	fprintf(stderr, "fuse_main returned %d\n", fuse_stat);
+
+	return fuse_stat;
 }
