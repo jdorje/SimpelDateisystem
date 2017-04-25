@@ -233,7 +233,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 	{
 		statbuf->st_dev = 0;
 		statbuf->st_ino = 0;
-		statbuf->st_mode = inodes[0].mode;
+		statbuf->st_mode = (strcmp(path,"/")==0) ? inodes[0].mode : S_IFREG;
 		statbuf->st_nlink = 0;
 		statbuf->st_uid = inodes[0].uid;
 		statbuf->st_gid = getgid();
