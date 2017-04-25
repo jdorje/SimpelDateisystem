@@ -233,40 +233,42 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		statbuf->st_ctime = 0;
 		statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
 		statbuf->st_blocks = 0;
+		retstat = 0;
+	}
+	else 
+	{
+
+
+		// find file 
+		fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
+		if(fileHandle == NULL){
+
+			log_msg("\nEIO\n");
+			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
+					path, statbuf);
+			retstat = -1;
+			errno = ENOENT;
+			return retstat;
+
+		}
+
+		//modify attributes in statbuf according to the fileHandle
+		//meaningless fields will be set to 0
+		statbuf->st_dev = 0;
+		statbuf->st_ino = 0;
+		statbuf->st_mode = 0;
+		statbuf->st_nlink = 0;
+		statbuf->st_uid = fileHandle->uid;
+		statbuf->st_gid = getgid();
+		statbuf->st_rdev = 0;
+		statbuf->st_size = fileHandle->fileSize;
+		statbuf->st_atime = fileHandle->time;
+		statbuf->st_mtime = 0;
+		statbuf->st_ctime = 0;
+		statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
+		statbuf->st_blocks = 0;
 
 	}
-
-
-	// find file 
-	fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
-	if(fileHandle == NULL){
-
-		log_msg("\nEIO\n");
-		log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
-				path, statbuf);
-		retstat = -1;
-		errno = ENOENT;
-		return retstat;
-
-	}
-
-	//modify attributes in statbuf according to the fileHandle
-	//meaningless fields will be set to 0
-	statbuf->st_dev = 0;
-	statbuf->st_ino = 0;
-	statbuf->st_mode = 0;
-	statbuf->st_nlink = 0;
-	statbuf->st_uid = fileHandle->uid;
-	statbuf->st_gid = getgid();
-	statbuf->st_rdev = 0;
-	statbuf->st_size = fileHandle->fileSize;
-	statbuf->st_atime = fileHandle->time;
-	statbuf->st_mtime = 0;
-	statbuf->st_ctime = 0;
-	statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
-	statbuf->st_blocks = 0;
-
-
 
 
 	log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
@@ -283,9 +285,8 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir){
 
 	// check for valid path length
-	if(strlen(filePath) <  2)
+	if(strlen(filePath) <  2) 
 		log_msg("\nEIO\n");
-
 
 	BOOL found = FALSE;
 	BOOL lastToken = FALSE;
@@ -686,7 +687,7 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 	fcbNode *curr = directory->dirContents;
 
 	while(curr != NULL){
-
+		log_msg("\n inLoop: filler on \n", curr->fileOrDir->fileName);
 		filler(buf, curr->fileOrDir->fileName, NULL, 0);
 		curr = curr->next;
 	}
