@@ -68,24 +68,6 @@ struct fcbNode{
 } ;
 
 
-typedef struct {
-
-	long size; //how many bytes are in this file?
-	long ctime; //what time was this file created?
-	long mtime; //what time was this file last modified?
-	long dtime; //what time was this inode deleted?
-	short gid; //what group does this file belong to?
-	short links_count; //how many hard links are there to this file?
-	long blocks; //how many blocks have been allocated to this file?
-	long flags; //how should ext2 use this inode?
-	long osd1; //an OS-dependent field
-
-	long generation; //file version (used by NFS)
-	long file_acl; //a new permissions model beyond mode bits
-	long dir_acl; //called access control lists
-} iknoten;
-
-
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir);
 fileControlBlock *findRootOrDieTrying();
 

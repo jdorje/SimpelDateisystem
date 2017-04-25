@@ -168,6 +168,7 @@ int formatDisk(superblock *sBlock)
 	inodes[0].fileSize = 0;
 	inodes[0].parentDir[0] = '\0';
 	inodes[0].fileType = IS_DIR;
+	inodes[0].mode = S_IFDIR;
 
 	inodes[0].uid = getuid();
 	inodes[0].time = time(NULL);
@@ -180,7 +181,7 @@ int formatDisk(superblock *sBlock)
 	block_write_padded(0, sBlock, sizeof(superblock));
 	block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
 	/* TODO: lookup these fields and assign to root dir appropriately
-	   short mode; //can this file be read/written/executed?
+	   short; //can this file be read/written/executed?
 	   char block[60]; //a set of disk pointers (15 total)
 	   long time; //what time was this file last accessed?
 	   */
@@ -211,13 +212,23 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 	char fpath[PATH_MAX];
 
 	// check if path name is too long
-	if(strlen(path) > PATH_MAX)
-		log_msg("\nENAMETOOLONG\n");
+	if(strlen(path) > PATH_MAX) {
+		log_msg("\nName too long for me, oops\n");
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	if (statbuf == NULL) {
+		log_msg("\nWhat are you doing, statbuf is null\n");
+		errno = EIO;
+		return -1;
+	}
 
 	if(strcmp(path, "/.Trash") == 0 ||
 			(
 			 strncmp(path, "/.Trash-", 8) == 0) &&
-			(strlen(path) == 13) // It is /.Trash-XXXXX
+			(strlen(path) == 13) || // It is /.Trash-XXXXX
+		(strcmp(path, "/") == 0)
 	  )
 	{
 		statbuf->st_dev = 0;
@@ -234,9 +245,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
 		statbuf->st_blocks = 0;
 		retstat = 0;
-	}
-	else 
-	{
+	} else {
 
 
 		// find file 
