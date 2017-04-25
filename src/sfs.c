@@ -294,6 +294,11 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir){
 
 	// check for valid path length
+	
+	if (strcmp(filePath, "/") == 0) {
+		return findRootOrDieTrying();
+	}
+	
 	if(strlen(filePath) <  2) 
 		log_msg("\nEIO\n");
 
