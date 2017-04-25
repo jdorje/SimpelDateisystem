@@ -482,6 +482,7 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 					//set rest of inode fields
 					inodes[i].fileType = IS_FILE;
+					inodes[i].mode = S_IFREG;
 					inodes[i].uid = getuid();
 					inodes[i].time = time(NULL);
 					inodes[i].dirContents = currNode;
