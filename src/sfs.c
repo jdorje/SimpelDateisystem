@@ -252,9 +252,13 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
 		if(fileHandle == NULL){
 
-			log_msg("\nEIO\n");
-			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
-					path, statbuf);
+			log_msg("\nnot found so let's create it lmao\n");
+			int fd = open(path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+
+			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x); fd for new = %d\n",
+					path, statbuf, fd);
+			
+
 			retstat = -1;
 			errno = ENOENT;
 			return retstat;
