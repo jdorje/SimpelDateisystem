@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 
 #include "block.h"
+#include "knoten.h"
 
 int diskfile = -1;
 
@@ -54,6 +55,19 @@ int block_read(const int block_num, void *buf)
     return retstat;
 }
 
+int inode_read(const int block_num, void *buf, int offset)
+{
+    int retstat = 0;
+    retstat = pread(diskfile, buf, sizeof(fileControlBlock), block_num*BLOCK_SIZE + offset);
+    if (retstat <= 0){
+    memset(buf, 0, BLOCK_SIZE);
+    if(retstat<0)
+    perror("block_read failed");
+    }
+
+    return retstat;
+}
+
 /** Write a block to an open file
  *
  * Write should return exactly @BLOCK_SIZE except on error. 
@@ -68,15 +82,15 @@ int block_write(const int block_num, const void *buf)
     return retstat;
 }
 
-int block_write_padded(const int block_num, const void *buf, int size)
+int block_write_padded(const int block_num, const void *buf, int size, int offset)
 {
     int retstat = 0;
     char tmp_buffer[BLOCK_SIZE];
     memset(tmp_buffer, '0', sizeof(tmp_buffer));
 
-    retstat = pwrite(diskfile, tmp_buffer, BLOCK_SIZE, block_num*BLOCK_SIZE);
+    retstat = pwrite(diskfile, tmp_buffer, BLOCK_SIZE, block_num*BLOCK_SIZE + offset);
     if (retstat >= 0) {
-        retstat = pwrite(diskfile, buf, size, block_num*BLOCK_SIZE);
+        retstat = pwrite(diskfile, buf, size, block_num*BLOCK_SIZE + offset);
     }
 
     if (retstat < 0)

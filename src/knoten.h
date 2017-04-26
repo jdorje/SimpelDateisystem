@@ -2,7 +2,7 @@
 #define __KNOTEN_H__
 
 
-#define MAX_BLOCKS 512
+#define MAX_BLOCKS 1024
 #define NAME_SIZE 256
 
 typedef enum {
