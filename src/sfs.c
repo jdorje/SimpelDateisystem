@@ -646,12 +646,25 @@ int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 		struct fuse_file_info *fi)
 {
-	int retstat = 0;
+	int bytes_written = -1;
+	char buffaway[BLOCK_SIZE];
 	log_msg("\nsfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 			path, buf, size, offset, fi);
 
+	fileControlBlock *root = findRootOrDieTrying();
+	if (root != NULL) {
+		fileControlBlock *fc = findFileOrDir(path, root, FALSE);
+		if (fc != NULL) {
+			int i = 0;
+		} else {
+			log_msg("\n cannot find the file \n");
+			errno = ENOENT;
+		}
+	} else {
+		log_msg("\n cannot find root dir, uhhhh? \n");
+	}
 
-	return retstat;
+	return bytes_written;
 }
 
 
