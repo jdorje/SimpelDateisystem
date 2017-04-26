@@ -228,7 +228,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 			(
 			 strncmp(path, "/.Trash-", 8) == 0) &&
 			(strlen(path) == 13) || // It is /.Trash-XXXXX
-		(strcmp(path, "/") == 0)
+			(strcmp(path, "/") == 0)
 	  )
 	{
 		statbuf->st_dev = 0;
@@ -257,7 +257,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 
 			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x); fd for new = %d\n",
 					path, statbuf, fd);
-			
+
 
 			retstat = -1;
 			errno = ENOENT;
@@ -298,11 +298,11 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir){
 
 	// check for valid path length
-	
+
 	if (strcmp(filePath, "/") == 0) {
 		return findRootOrDieTrying();
 	}
-	
+
 	if(strlen(filePath) <  2) 
 		log_msg("\nEIO\n");
 
@@ -518,23 +518,53 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 /** Remove a file */
 int sfs_unlink(const char *path)
 {
-	int retstat = 0;
+	int retstat = -1;
 	log_msg("sfs_unlink(path=\"%s\")\n", path);
 
 	fileControlBlock *root = findRootOrDieTrying();
 	if(root != NULL) {
 		fileControlBlock *fcbToUnlink = findFileOrDir(path, root, FALSE);
 		if (fcbToUnlink != NULL) {
-			//free block data.
-			//update the inode bitmap entry
+			//unlink from the linked list structure
+			char* parentDname = &(fcbToUnlink->parentDir[0]);
+			if (parentDname != NULL) {
+				fileControlBlock *parentDir = findFileOrDir(parentDname, root, TRUE);
+				if ((parentDir != NULL) && (parentDir->dirContents != NULL)) {
+					fcbNode* LLstructure = parentDir->dirContents->head, *prev = NULL;
+
+					while (LLstructure != NULL) {
+
+						if (LLstructure->fileOrDir != NULL) {
+							char* nameOfCurr = &(LLstructure->fileOrDir->fileName[0]);
+							if (strcmp(nameOfCurr, &(fcbToUnlink->fileName[0])) == 0) {
+								if (LLstructure == LLstructure->head) {
+									LLstructure->head = LLstructure->next; //unless it's null, but let's not worry about that (now)
+								} else { 
+									prev = LLstructure->next;	
+								}
+								retstat = 0;
+							}
+						}
+
+						prev = LLstructure;
+						LLstructure = LLstructure->next;
+					}
+					//TODO: free block data.
+					//TODO: update the inode bitmap entry
+				} else {
+					log_msg("cannot get a handle on the parent directory\n OR parentDir is null so I can't get head");
+					errno = EIO;
+				}
+			} else {
+				log_msg("no name for parent directory?");
+				errno = EIO;
+			}
 		} else {
 			log_msg("unable to find file you want to remove");
-			retstat = -1;
 			errno = ENOENT;
 		}
 	} else {
 		errno = EIO;
-		retstat = -1;
 	}
 
 	return retstat;
