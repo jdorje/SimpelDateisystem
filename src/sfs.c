@@ -54,7 +54,9 @@
 
 fileControlBlock inodes[64];
 char *diskFile;
-superblock *sBlock;
+superblock sBlockData;
+superblock *sBlock = &sBlockData;
+
 
 void *sfs_init(struct fuse_conn_info *conn)
 {
@@ -66,7 +68,6 @@ void *sfs_init(struct fuse_conn_info *conn)
 	//log_fuse_context(fuse_get_context());
 	disk_open(diskFile);
 	char buf[BLOCK_SIZE];
-	sBlock = malloc(sizeof(superblock));
 
 	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
@@ -87,15 +88,10 @@ void *sfs_init(struct fuse_conn_info *conn)
 			formatDisk(sBlock); //NEED TO CHANGE METHOD TO INCLUDE FLAG TO CONVERT TO OUR FS
 		}
 
-		//check if root dir
-		if(strcmp(inodes[1].fileName, "/") == 0){
-
-
-		}
-
-
+		//i is equal to 1 since root is already created
 		int i = 1;
-		for(; i < 20; i++){
+		int endCond = sBlock->numInodes;
+		for(; i < endCond; i++){
 
 			int isSucc = block_read(i, &inodes[i]);
 			//log_msg("\n Reading inodes...\n");
@@ -148,7 +144,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 	}
 
 	//use block read to 
-	showInodeNames();
+	//showInodeNames();
 	return SFS_DATA;
 }
 
@@ -159,8 +155,7 @@ int formatDisk(superblock *sBlock)
 	sBlock->numInodes = 64;
 	sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
 	sBlock->inodeStartIndex = 1; // index of the first inode struct
-
-
+	
 	// set up root dir
 
 	inodes[0].fileName[0] = '/';
@@ -174,12 +169,32 @@ int formatDisk(superblock *sBlock)
 	inodes[0].time = time(NULL);
 	inodes[0].dirContents = NULL;
 
+	//write to disk
+	block_write_padded(0, sBlock, sizeof(superblock));
+	block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
+
 	//TODO: FORMAT ALL INODES HERE!! THE ENTIRE ARRAY
+	int i = 1;
+	int endCond = sBlock->numInodes;
+	for(; i < (endCond - 1); i++){
+
+		fileControlBlock curr = inodes[i];
+		//TODO ENSURE THESE FIELDS ARE CORRECT
+		curr.fileName[0] = '\0';
+		curr.fileSize = 0;
+		curr.parentDir[0] = '\0';
+		curr.fileType = IS_DIR;
+		curr.mode = S_IFDIR;
+
+		curr.uid = getuid();
+		curr.time = time(NULL);
+		curr.dirContents = NULL;
+
+		//NEED BLOCK WRITE HERE FOR THE INODES
+	}
 
 	//********************************
 
-	block_write_padded(0, sBlock, sizeof(superblock));
-	block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
 	/* TODO: lookup these fields and assign to root dir appropriately
 	   short; //can this file be read/written/executed?
 	   char block[60]; //a set of disk pointers (15 total)
@@ -354,7 +369,7 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 
 					// recursively search subdirectories
 					// will use the fcbNodes
-					findFileOrDir(filePath + strlen(temp), currFCB, isDir);
+					return findFileOrDir(filePath + strlen(temp), currFCB, isDir);
 
 
 				} else if(currFCB->fileType == IS_FILE){
@@ -385,7 +400,7 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 				if(strcmp(temp, currNode->fileOrDir->fileName) == 0){
 					// recursively search subdirectories
 					// will use the fcbNodes
-					findFileOrDir(filePath + strlen(temp), currNode->fileOrDir, isDir);
+					return findFileOrDir(filePath + strlen(temp), currNode->fileOrDir, isDir);
 
 				}
 
@@ -715,7 +730,14 @@ void showInodeNames(){
 
 	int i = 0;
 	for(i; i < 64; i++){
-		log_msg("Inode Name: %s\n", inodes[i].fileName);
+
+		if(inodes[i].fileName[0] == '\0'){
+			log_msg("Inode Name [%d]: NULL \n", i );
+		}
+		else {
+			log_msg("Inode Name [%d]: %s\n", i, inodes[i].fileName);
+			log_msg("Inode Name [%d]: NULL\n", i );
+		}
 	}
 }
 /** Release directory

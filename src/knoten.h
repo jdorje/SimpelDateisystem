@@ -74,4 +74,8 @@ fileControlBlock *findRootOrDieTrying();
 int formatDisk(superblock *sBlock);
 void showInodeNames();
 
+int getFreeBlockNum();
+int getFreeInodeNum();
+int createAllInodes();
+
 #endif
