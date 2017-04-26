@@ -168,7 +168,7 @@ int formatDisk(superblock *sBlock)
 	inodes[0].fileSize = 0;
 	inodes[0].parentDir[0] = '\0';
 	inodes[0].fileType = IS_DIR;
-	inodes[0].mode = S_IFDIR;
+	inodes[0].mode = S_IFDIR | 0755;
 
 	inodes[0].uid = getuid();
 	inodes[0].time = time(NULL);
@@ -233,7 +233,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 	{
 		statbuf->st_dev = 0;
 		statbuf->st_ino = 0;
-		statbuf->st_mode = (strcmp(path,"/")==0) ? inodes[0].mode : S_IFREG;
+		statbuf->st_mode = (strcmp(path,"/")==0) ? inodes[0].mode : S_IFREG | 0666;
 		statbuf->st_nlink = 0;
 		statbuf->st_uid = inodes[0].uid;
 		statbuf->st_gid = getgid();
@@ -252,17 +252,17 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
 		if(fileHandle == NULL){
 
-			log_msg("\nnot found so let's create it lmao\n");
-			int fd = open(path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+//			log_msg("\nnot found so let's create it lmao\n");
+//			int fd = open(path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
 
-			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x); fd for new = %d\n",
-					path, statbuf, fd);
+			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x);",
+					path, statbuf);
 
 
 			retstat = -1;
-			errno = ENOENT;
-			return retstat;
-
+		//	errno = ENOENT;
+			//return retstat;
+			return -ENOENT;
 		}
 
 		//modify attributes in statbuf according to the fileHandle
@@ -479,6 +479,7 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 					}
 
 					// accounts for slashes
+
 					memcpy(&inodes[i].parentDir, (path + firstSlash + 1), (secondSlash - 1) );
 
 					//handle linked list structure
@@ -491,7 +492,7 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 					//set rest of inode fields
 					inodes[i].fileType = IS_FILE;
-					inodes[i].mode = S_IFREG;
+					inodes[i].mode = S_IFREG | 0666;
 					inodes[i].uid = getuid();
 					inodes[i].time = time(NULL);
 					inodes[i].dirContents = currNode;
