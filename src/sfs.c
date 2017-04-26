@@ -494,6 +494,7 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 		fileControlBlock *inode = findFileOrDir(path, root, FALSE);
 
+
 		if(inode == NULL){
 
 			int i = 0;
@@ -508,42 +509,51 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 					//parent dir is string between previous set of slashes
 					int firstSlash;
 					int secondSlash;
-					char curr = *path;
-					int numSlashesFound = 0;
-					int index = 0;
-					while(numSlashesFound != 2){
+					char curr = *( path + strlen(path) - 1);
+					BOOL slashFound = FALSE;
+					int offset = 0;
+					while(slashFound = FALSE){
+			
+						if(curr == '/')
+							slashFound == TRUE;
 
-						if(curr == '/' && numSlashesFound == 0){
-							numSlashesFound++;
-							firstSlash = index;
-						}
-						else if(curr == '/' && numSlashesFound == 1){
-							numSlashesFound++;
-							secondSlash = index;
-						}
-
-						curr = *(path + index);
-						index++;
+						offset++;
+						curr = *(path + strlen(path) - offset);
 
 					}
 
 					// accounts for slashes
-					memcpy(&inodes[i].parentDir, (path + firstSlash + 1), (secondSlash - 1) );
+					memcpy(&inodes[i].parentDir, path, strlen(path) - offset );
+					//find parent to s
+					fileControlBlock *parent = findFileOrDir(inodes[i].parentDir, root, TRUE);
 
-					//handle linked list structure
-					fcbNode *prev = inodes[i - 1].dirContents;
-					fcbNode *currNode = inodes[i].dirContents;
-					prev->next = currNode;
-					currNode->fileOrDir = &inodes[i];
-					currNode->next = NULL;
-					//do we need to set head here!?
+					//check dirContents if empty, if so add to head
+					if(parent->dirContents[0] == NULL){
+						parent->dirContents[0] = &inodes[i];
+						parent->dirContents[1] = NULL;
+					}
+
+					else {
+						
+						//find next free space in array
+						int i = 0;
+						for(; i < MAX_FILES_IN_DIR; i++){
+
+							if(parent->dirContents[i] == NULL){
+								parent->dirContents[i] = &inodes[i];
+								parent->dirContents[i + 1] = NULL;
+							}
+
+						}
+
+					}
 
 					//set rest of inode fields
 					inodes[i].fileType = IS_FILE;
 					inodes[i].mode = S_IFREG;
 					inodes[i].uid = getuid();
 					inodes[i].time = time(NULL);
-					inodes[i].dirContents = currNode;
+					inodes[i].dirContents[0] = NULL;
 
 				}
 
@@ -794,13 +804,18 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 		log_msg("\n Could not find directory using path: %s \n", path);
 		return -1;
 	}
+	
+	// end condition if true
+	if(directory->dirContents[0] == NULL)
+		return retstat;
 
-	fcbNode *curr = directory->dirContents;
+	fileControlBlock *curr = directory->dirContents[0];
 
+	int i = 1;
 	while(curr != NULL){
-		log_msg("\n inLoop: filler on \n", curr->fileOrDir->fileName);
-		filler(buf, curr->fileOrDir->fileName, NULL, 0);
-		curr = curr->next;
+		log_msg("\n inLoop: filler on \n", curr->fileName);
+		filler(buf, curr->fileName, NULL, 0);
+		curr = directory->dirContents[i];
 	}
 
 	return retstat;
