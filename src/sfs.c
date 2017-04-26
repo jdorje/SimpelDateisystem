@@ -71,29 +71,48 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
-	//check if superblock is created, if not create one
-	if( ret != 0){
+	
+	// Create everything from the start
+	if(ret == 0){
+		int x = 1024 * 1024 - 1;
+        FILE *fp = fopen("../output.file", "w");
+        fseek(fp, x , SEEK_SET);
+        fputc('\0', fp);
+        
+		formatDisk(sBlock);
+
+	}
+	// see if filesystem already exists
+	else if( ret > 0){
 
 		log_msg("\n Superblock loaded...\n");
 		memcpy(sBlock, buf, BLOCK_SIZE);
 		// check if file system matches ours
 		if(sBlock->magicNum == 666){
 			log_msg("\n Magic number MATCHES OURS.\n");
-			formatDisk(sBlock);
 		}
 		//convert to our file system
 		else {
 			log_msg("\n Magic number does not match.\n");
 			log_msg("\n The number received was: %d\n", sBlock->magicNum);
-			formatDisk(sBlock); //NEED TO CHANGE METHOD TO INCLUDE FLAG TO CONVERT TO OUR FS
+
+			//TODO impl method to convert fs to match ours
 		}
+
+		// read in root dir
+		if( inode_read(1, &inodes[0], 0) < 0)
+			log_msg("\n Problem reading root dir! \n");
 
 		//i is equal to 1 since root is already created
 		int i = 1;
 		int endCond = sBlock->numInodes;
-		for(; i < endCond; i++){
+		// each block can fit 6 inodes
+		int currBlockFillNum = 1;
+		int currBlock = 1;
+		while(i < endCond){
 
-			int isSucc = block_read(i, &inodes[i]);
+			int isSucc = inode_read(currBlock, &inodes[i], 
+				currBlockFillNum * sizeof(fileControlBlock) );
 			//log_msg("\n Reading inodes...\n");
 
 			if(isSucc){
@@ -105,7 +124,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 				if(fcb.fileType == IS_DIR){
 
 					//log_msg("\n dir found.\n");
-					block_write_padded(i, &fcb, sizeof(fileControlBlock));			
+					//block_write_padded(i, &fcb, sizeof(fileControlBlock));			
 				} 
 				//check if we have file
 				else if(fcb.fileType == IS_FILE){
@@ -118,10 +137,15 @@ void *sfs_init(struct fuse_conn_info *conn)
 					else
 						sBlock->dbmap[i] = USED;
 
-					block_write_padded(i, &fcb, sizeof(fileControlBlock));			
+					//block_write_padded(i, &fcb, sizeof(fileControlBlock));			
 
 				}
 
+				currBlockFillNum++;
+				if(currBlockFillNum >= 6){
+					currBlockFillNum = 0;
+					currBlock++;
+				} 
 
 
 			} else {
@@ -131,26 +155,23 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 			}
 
-
+			i++;
 		}
 
 
-	} 
-	// Create everything from the start
-	else {
+	} else{
 
-		formatDisk(sBlock);
-
+		log_msg("\n Error trying to initiate disk! \n");
 	}
 
-	//use block read to 
-	//showInodeNames();
 	return SFS_DATA;
 }
 
 int formatDisk(superblock *sBlock)
 {
 	log_msg("\n Creating file system from scratch...\n");
+
+	// set up sBlock located in block 0
 	sBlock->magicNum = 666;
 	sBlock->numInodes = 64;
 	sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
@@ -170,8 +191,13 @@ int formatDisk(superblock *sBlock)
 	inodes[0].dirContents = NULL;
 
 	//write to disk
-	block_write_padded(0, sBlock, sizeof(superblock));
-	block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
+	block_write_padded(0, sBlock, sizeof(superblock), 0);
+
+	//no offset for the first fcb (aka root)
+	block_write_padded(1, &inodes[0], sizeof(fileControlBlock), 0);
+	// start at 1 to account for the root node being written!
+	int currBlockFillNum = 1;
+	int currBlock = 1;
 
 	//TODO: FORMAT ALL INODES HERE!! THE ENTIRE ARRAY
 	int i = 1;
@@ -190,7 +216,16 @@ int formatDisk(superblock *sBlock)
 		curr.time = time(NULL);
 		curr.dirContents = NULL;
 
+		block_write_padded( currBlock, &inodes[i], 
+			sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
+
 		//NEED BLOCK WRITE HERE FOR THE INODES
+		currBlockFillNum++;
+		if(currBlockFillNum >= 6){
+			currBlockFillNum = 0;
+			currBlock++;
+		} 
+
 	}
 
 	//********************************
@@ -243,12 +278,12 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 			(
 			 strncmp(path, "/.Trash-", 8) == 0) &&
 			(strlen(path) == 13) || // It is /.Trash-XXXXX
-		(strcmp(path, "/") == 0)
+			(strcmp(path, "/") == 0)
 	  )
 	{
 		statbuf->st_dev = 0;
 		statbuf->st_ino = 0;
-		statbuf->st_mode = inodes[0].mode;
+		statbuf->st_mode = (strcmp(path,"/")==0) ? inodes[0].mode : S_IFREG;
 		statbuf->st_nlink = 0;
 		statbuf->st_uid = inodes[0].uid;
 		statbuf->st_gid = getgid();
@@ -267,9 +302,13 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
 		if(fileHandle == NULL){
 
-			log_msg("\nEIO\n");
-			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
-					path, statbuf);
+			log_msg("\nnot found so let's create it lmao\n");
+			int fd = open(path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+
+			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x); fd for new = %d\n",
+					path, statbuf, fd);
+
+
 			retstat = -1;
 			errno = ENOENT;
 			return retstat;
@@ -309,11 +348,11 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir){
 
 	// check for valid path length
-	
+
 	if (strcmp(filePath, "/") == 0) {
 		return findRootOrDieTrying();
 	}
-	
+
 	if(strlen(filePath) <  2) 
 		log_msg("\nEIO\n");
 
@@ -529,23 +568,53 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 /** Remove a file */
 int sfs_unlink(const char *path)
 {
-	int retstat = 0;
+	int retstat = -1;
 	log_msg("sfs_unlink(path=\"%s\")\n", path);
 
 	fileControlBlock *root = findRootOrDieTrying();
 	if(root != NULL) {
 		fileControlBlock *fcbToUnlink = findFileOrDir(path, root, FALSE);
 		if (fcbToUnlink != NULL) {
-			//free block data.
-			//update the inode bitmap entry
+			//unlink from the linked list structure
+			char* parentDname = &(fcbToUnlink->parentDir[0]);
+			if (parentDname != NULL) {
+				fileControlBlock *parentDir = findFileOrDir(parentDname, root, TRUE);
+				if ((parentDir != NULL) && (parentDir->dirContents != NULL)) {
+					fcbNode* LLstructure = parentDir->dirContents->head, *prev = NULL;
+
+					while (LLstructure != NULL) {
+
+						if (LLstructure->fileOrDir != NULL) {
+							char* nameOfCurr = &(LLstructure->fileOrDir->fileName[0]);
+							if (strcmp(nameOfCurr, &(fcbToUnlink->fileName[0])) == 0) {
+								if (LLstructure == LLstructure->head) {
+									LLstructure->head = LLstructure->next; //unless it's null, but let's not worry about that (now)
+								} else { 
+									prev = LLstructure->next;	
+								}
+								retstat = 0;
+							}
+						}
+
+						prev = LLstructure;
+						LLstructure = LLstructure->next;
+					}
+					//TODO: free block data.
+					//TODO: update the inode bitmap entry
+				} else {
+					log_msg("cannot get a handle on the parent directory\n OR parentDir is null so I can't get head");
+					errno = EIO;
+				}
+			} else {
+				log_msg("no name for parent directory?");
+				errno = EIO;
+			}
 		} else {
 			log_msg("unable to find file you want to remove");
-			retstat = -1;
 			errno = ENOENT;
 		}
 	} else {
 		errno = EIO;
-		retstat = -1;
 	}
 
 	return retstat;
@@ -627,12 +696,25 @@ int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 		struct fuse_file_info *fi)
 {
-	int retstat = 0;
+	int bytes_written = -1;
+	char buffaway[BLOCK_SIZE];
 	log_msg("\nsfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 			path, buf, size, offset, fi);
 
+	fileControlBlock *root = findRootOrDieTrying();
+	if (root != NULL) {
+		fileControlBlock *fc = findFileOrDir(path, root, FALSE);
+		if (fc != NULL) {
+			int i = 0;
+		} else {
+			log_msg("\n cannot find the file \n");
+			errno = ENOENT;
+		}
+	} else {
+		log_msg("\n cannot find root dir, uhhhh? \n");
+	}
 
-	return retstat;
+	return bytes_written;
 }
 
 
