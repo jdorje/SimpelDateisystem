@@ -430,9 +430,9 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 			char currChar = *( filePath + strlen(filePath) - 1);
 			BOOL slashFound = FALSE;
 			int offset = 0;
-			while(slashFound = FALSE){
+			while(slashFound == FALSE){
 	
-				if(currChar == '/')
+				if(currChar == '/' || curr == '\0')
 					slashFound == TRUE;
 
 				offset++;
@@ -519,7 +519,7 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 					int offset = 0;
 					while(slashFound = FALSE){
 			
-						if(curr == '/')
+						if(curr == '/' || curr == '\0')
 							slashFound == TRUE;
 
 						offset++;
@@ -527,26 +527,28 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 					}
 
+					char *temp;
+					memcpy(temp, path, strlen(path) - offset );
 					// accounts for slashes
 					memcpy(&inodes[i].parentDir, path, strlen(path) - offset );
 					//find parent
-					fileControlBlock *parent = findFileOrDir(&inodes[i].parentDir, root, TRUE);
+					fileControlBlock *parent = findFileOrDir(temp, root, TRUE);
 
 					//check dirContents if empty, if so add to head
-					if(parent->dirContents[0] == NULL){
+					if(parent->dirContents == NULL){
+						//TODO malloc the pointers
 						parent->dirContents[0] = &inodes[i];
 						parent->dirContents[1] = NULL;
-					}
-
-					else {
+					} else {
 						
 						//find next free space in array
-						int i = 0;
-						for(; i < MAX_FILES_IN_DIR; i++){
+						int x = 0;
+						for(; x < MAX_FILES_IN_DIR; x++){
 
-							if(parent->dirContents[i] == NULL){
-								parent->dirContents[i] = &inodes[i];
-								parent->dirContents[i + 1] = NULL;
+							if(parent->dirContents[x] == NULL){
+								//TODO malloc the pointers
+								parent->dirContents[x] = &inodes[i];
+								parent->dirContents[x + 1] = NULL;
 							}
 
 						}
@@ -558,7 +560,7 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 					inodes[i].mode = S_IFREG;
 					inodes[i].uid = getuid();
 					inodes[i].time = time(NULL);
-					inodes[i].dirContents[0] = NULL;
+					inodes[i].dirContents = NULL;
 
 				}
 
@@ -806,7 +808,7 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 	}
 	
 	// end condition if true
-	if(directory->dirContents[0] == NULL)
+	if(directory->dirContents == NULL)
 		return retstat;
 
 	fileControlBlock *curr = directory->dirContents[0];
