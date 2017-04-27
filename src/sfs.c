@@ -180,6 +180,8 @@ int formatDisk(superblock *sBlock)
 
 	block_write_padded(0, sBlock, sizeof(superblock));
 	block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
+
+	sBlock->ibmap[0]=USED;
 	/* TODO: lookup these fields and assign to root dir appropriately
 	   short; //can this file be read/written/executed?
 	   char block[60]; //a set of disk pointers (15 total)
@@ -252,15 +254,15 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
 		if(fileHandle == NULL){
 
-//			log_msg("\nnot found so let's create it lmao\n");
-//			int fd = open(path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+			//			log_msg("\nnot found so let's create it lmao\n");
+			//			int fd = open(path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
 
 			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x);",
 					path, statbuf);
 
 
 			retstat = -1;
-		//	errno = ENOENT;
+			//	errno = ENOENT;
 			//return retstat;
 			return -ENOENT;
 		}
@@ -412,6 +414,7 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 fileControlBlock *findRootOrDieTrying()
 {
 	fileControlBlock *root = &inodes[0];
+	
 	if (root == NULL) {
 		log_msg("\n ROOT is NULL\n");
 		return NULL;
@@ -445,62 +448,12 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 		fileControlBlock *inode = findFileOrDir(path, root, FALSE);
 
-		if(inode == NULL){
+		if(inode == NULL)
+		{
 
-			int i = 0;
-			while(i < sBlock->numDataBlocks){
-
-				// free inode space found!
-				if(inodes[i].fileName != '\0'){
-
-					memcpy(&inodes[i].fileName, path, strlen(path));
-					inodes[i].fileSize = 0; //no data yet, still unknown
-
-					//parent dir is string between previous set of slashes
-					int firstSlash;
-					int secondSlash;
-					char curr = *path;
-					int numSlashesFound = 0;
-					int index = 0;
-					while(numSlashesFound != 2){
-
-						if(curr == '/' && numSlashesFound == 0){
-							numSlashesFound++;
-							firstSlash = index;
-						}
-						else if(curr == '/' && numSlashesFound == 1){
-							numSlashesFound++;
-							secondSlash = index;
-						}
-
-						curr = *(path + index);
-						index++;
-
-					}
-
-					// accounts for slashes
-
-					memcpy(&inodes[i].parentDir, (path + firstSlash + 1), (secondSlash - 1) );
-
-					//handle linked list structure
-					fcbNode *prev = inodes[i - 1].dirContents;
-					fcbNode *currNode = inodes[i].dirContents;
-					prev->next = currNode;
-					currNode->fileOrDir = &inodes[i];
-					currNode->next = NULL;
-					//do we need to set head here!?
-
-					//set rest of inode fields
-					inodes[i].fileType = IS_FILE;
-					inodes[i].mode = S_IFREG | 0666;
-					inodes[i].uid = getuid();
-					inodes[i].time = time(NULL);
-					inodes[i].dirContents = currNode;
-
-				}
+			create_inode(IS_FILE ,path);			
 
 
-			}
 
 
 
@@ -668,6 +621,85 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	return bytes_written;
 }
 
+fileControlBlock *create_inode(fileType ftype, char * path)
+{
+	int i =0;
+	while(i < sBlock->numDataBlocks)
+	{
+
+		// free inode space found!
+		if(sBlock->ibmap!=USED)
+		{
+
+			memcpy(&inodes[i].fileName, path, strlen(path));
+			inodes[i].fileSize = 0; //no data yet, still unknown
+
+			//parent dir is string between previous set of slashes
+			int firstSlash;
+			int secondSlash;
+			char curr = *path;
+			int numSlashesFound = 0;
+			int index = 0;
+			while(numSlashesFound != 2)
+			{
+
+				if(curr == '/' && numSlashesFound == 0){
+					numSlashesFound++;
+					firstSlash = index;
+				}
+				else if(curr == '/' && numSlashesFound == 1){
+					numSlashesFound++;
+					secondSlash = index;
+				}
+
+				curr = *(path + index);
+				index++;
+
+			}
+
+			// accounts for slashes
+
+			memcpy(&inodes[i].parentDir, (path + firstSlash + 1), (secondSlash - 1) );
+
+			//handle linked list structure
+			fcbNode *prev = inodes[i - 1].dirContents;
+			fcbNode *currNode = inodes[i].dirContents;
+			prev->next = currNode;
+			currNode->fileOrDir = &inodes[i];
+			currNode->next = NULL;
+			//do we need to set head here!?
+
+			//set rest of inode fields
+			inodes[i].fileType = ftype;
+
+			switch(ftype)
+			{
+				case IS_DIR:
+					inodes[i].mode = S_IFDIR | 0755;
+					break;
+				case IS_FILE:
+					inodes[i].mode = S_IFREG | 0666;
+					break;
+				default:
+					log_msg("\n What are you doing, file type is not correct! \n");
+					inodes[i].mode = S_IFREG | 0666;
+			}
+
+			inodes[i].uid = getuid();
+			inodes[i].time = time(NULL);
+			inodes[i].dirContents = currNode;
+			sBlock->ibmap[i]=USED;
+			return &inodes[i];
+		}
+			i++;
+
+
+	}
+
+	return NULL;
+
+
+}
 
 /** Create a directory */
 int sfs_mkdir(const char *path, mode_t mode)
@@ -675,6 +707,8 @@ int sfs_mkdir(const char *path, mode_t mode)
 	int retstat = 0;
 	log_msg("\nsfs_mkdir(path=\"%s\", mode=0%3o)\n",
 			path, mode);
+
+	create_inode(IS_DIR, path);
 
 
 	return retstat;

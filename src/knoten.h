@@ -15,8 +15,8 @@ typedef enum {
 
 typedef enum {
 	
-	USED,
-	NOT_USED
+	NOT_USED,
+	USED
 
 } status;
 
@@ -71,6 +71,7 @@ struct fcbNode{
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir);
 fileControlBlock *findRootOrDieTrying();
 
+fileControlBlock *create_inode(fileType type, char *filePath);
 int formatDisk(superblock *sBlock);
 void showInodeNames();
 
