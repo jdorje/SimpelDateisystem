@@ -417,8 +417,6 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 
 				}	
 
-
-
 			}
 
 
@@ -426,29 +424,38 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 		// temp name did not match, search current directory
 		else {
 
+			fileControlBlock *root = &inodes[0];
 
-			fileControlBlock *tempFCB = curr;
+			//parent dir is string between previous set of slashes
+			char currChar = *( filePath + strlen(filePath) - 1);
+			BOOL slashFound = FALSE;
+			int offset = 0;
+			while(slashFound = FALSE){
+	
+				if(currChar == '/')
+					slashFound == TRUE;
 
-			fcbNode *currNode = tempFCB->dirContents; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
+				offset++;
+				currChar = *(filePath + strlen(filePath) - offset);
 
-
-			while(currNode != NULL){
-
-
-				if(strcmp(temp, currNode->fileOrDir->fileName) == 0){
-					// recursively search subdirectories
-					// will use the fcbNodes
-					return findFileOrDir(filePath + strlen(temp), currNode->fileOrDir, isDir);
-
-				}
-
-				currNode = currNode->next;
 			}
 
+			fileControlBlock *parent = findFileOrDir(currFCB->parentDir, root, TRUE);
+			fileControlBlock *currFCB = parent->dirContents[0]; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
 
+			int i = 0;
+			while(currFCB != NULL){
 
+				if(strcmp(temp, currFCB->fileName) == 0){
+					// recursively search subdirectories
+					return currFCB;
+				}
+				
+				i++;
+				currFCB = parent->dirContents[i];
+			
+			}
 		}
-
 
 		x++;
 	}
@@ -507,8 +514,6 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 					inodes[i].fileSize = 0; //no data yet, still unknown
 
 					//parent dir is string between previous set of slashes
-					int firstSlash;
-					int secondSlash;
 					char curr = *( path + strlen(path) - 1);
 					BOOL slashFound = FALSE;
 					int offset = 0;
@@ -524,8 +529,8 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 					// accounts for slashes
 					memcpy(&inodes[i].parentDir, path, strlen(path) - offset );
-					//find parent to s
-					fileControlBlock *parent = findFileOrDir(inodes[i].parentDir, root, TRUE);
+					//find parent
+					fileControlBlock *parent = findFileOrDir(&inodes[i].parentDir, root, TRUE);
 
 					//check dirContents if empty, if so add to head
 					if(parent->dirContents[0] == NULL){
@@ -588,28 +593,23 @@ int sfs_unlink(const char *path)
 			char* parentDname = &(fcbToUnlink->parentDir[0]);
 			if (parentDname != NULL) {
 				fileControlBlock *parentDir = findFileOrDir(parentDname, root, TRUE);
-				if ((parentDir != NULL) && (parentDir->dirContents != NULL)) {
-					fcbNode* LLstructure = parentDir->dirContents->head, *prev = NULL;
+				if ((parentDir != NULL) && (parentDir->dirContents[0] != NULL)) {
 
-					while (LLstructure != NULL) {
 
-						if (LLstructure->fileOrDir != NULL) {
-							char* nameOfCurr = &(LLstructure->fileOrDir->fileName[0]);
-							if (strcmp(nameOfCurr, &(fcbToUnlink->fileName[0])) == 0) {
-								if (LLstructure == LLstructure->head) {
-									LLstructure->head = LLstructure->next; //unless it's null, but let's not worry about that (now)
-								} else { 
-									prev = LLstructure->next;	
-								}
-								retstat = 0;
-							}
-						}
+					// New code, just use array properties
+					int i = 0;
+					// find where parent points to the unlinked node
+					while (parentDir->dirContents[i] != fcbToUnlink) {
+						
+						parentDir->dirContents[i] = NULL;
 
-						prev = LLstructure;
-						LLstructure = LLstructure->next;
 					}
+
+
 					//TODO: free block data.
 					//TODO: update the inode bitmap entry
+
+
 				} else {
 					log_msg("cannot get a handle on the parent directory\n OR parentDir is null so I can't get head");
 					errno = EIO;
@@ -810,7 +810,6 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 		return retstat;
 
 	fileControlBlock *curr = directory->dirContents[0];
-
 	int i = 1;
 	while(curr != NULL){
 		log_msg("\n inLoop: filler on \n", curr->fileName);
