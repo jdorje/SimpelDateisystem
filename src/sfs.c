@@ -360,24 +360,10 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 	BOOL lastToken = FALSE;
 	char *temp = malloc(sizeof(char) * strlen(filePath));
 	//add one to account for forward slash
-	char compareChar = *(filePath + 1);
-	int offset = 1;
 
-	while(compareChar != '/'){
-
-		if(compareChar == '\0'){
-			lastToken = TRUE;
-			break;
-		}
-
-		offset++;
-		compareChar = *(filePath + offset);
-
-
-	}
-
-	//copy temp name to temp string
-	memcpy(temp, filePath, sizeof(char) * offset);
+	
+	char *pLastSlash = strrchr(filePath, '/');
+     char *fileBaseName = pLastSlash ? pLastSlash + 1 : filePath;
 
 	int x = 0;
 	while(found == FALSE && x < sBlock->numInodes){
@@ -385,7 +371,7 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 
 		fileControlBlock *currFCB = &inodes[x];
 		// found the file name
-		if(strcmp(currFCB->fileName, temp) == 0){
+		if(strcmp(currFCB->fileName, fileBaseName) == 0){
 
 			if(lastToken == TRUE){
 				//check if dir or not
@@ -408,7 +394,7 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 
 					// recursively search subdirectories
 					// will use the fcbNodes
-					return findFileOrDir(filePath + strlen(temp), currFCB, isDir);
+					return findFileOrDir(filePath + strlen(fileBaseName), currFCB, isDir);
 
 
 				} else if(currFCB->fileType == IS_FILE){
@@ -425,35 +411,22 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 		// temp name did not match, search current directory
 		else {
 
-			fileControlBlock *root = &inodes[0];
+			fileControlBlock *root = findRootOrDieTrying();
 
-			//parent dir is string between previous set of slashes
-			char currChar = *( filePath + strlen(filePath) - 1);
-			BOOL slashFound = FALSE;
-			int offset = 0;
-			while(slashFound == FALSE){
-	
-				if(currChar == '/' || curr == '\0')
-					slashFound == TRUE;
-
-				offset++;
-				currChar = *(filePath + strlen(filePath) - offset);
-
-			}
 
 			fileControlBlock *parent = findFileOrDir(currFCB->parentDir, root, TRUE);
-			fileControlBlock *currFCB = parent->dirContents[0]; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
+			fileControlBlock *currNode = parent->dirContents[0]; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
 
 			int i = 0;
-			while(currFCB != NULL){
+			while(currNode != NULL){
 
-				if(strcmp(temp, currFCB->fileName) == 0){
+				if(strcmp(fileBaseName, currNode->fileName) == 0){
 					// recursively search subdirectories
 					return currFCB;
 				}
 				
 				i++;
-				currFCB = parent->dirContents[i];
+				currNode = parent->dirContents[i];
 			
 			}
 		}
@@ -668,13 +641,14 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	return bytes_written;
 }
 
+
+
+
 fileControlBlock *create_inode(fileType ftype, char * path)
 {
 	int i =0;
 	while(i < sBlock->numDataBlocks)
 	{
-		// free inode space found!
-
 		// free inode space found!
 		if(sBlock->ibmap[i]!=USED)
 		{
