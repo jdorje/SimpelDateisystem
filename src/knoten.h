@@ -31,7 +31,6 @@ typedef enum {
 
 typedef struct fileControlBlock fileControlBlock;
 
-typedef struct fcbNode fcbNode;
 
 typedef struct {
 
