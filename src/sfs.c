@@ -52,7 +52,7 @@
 //TODO superblock (4KB)
 //TODO ibitmap (4KB) and data bitmap (4KB)
 
-fileControlBlock inodes[64];
+fileControlBlock inodes[100];
 char *diskFile;
 superblock sBlockData;
 superblock *sBlock = &sBlockData;
@@ -61,7 +61,6 @@ superblock *sBlock = &sBlockData;
 void *sfs_init(struct fuse_conn_info *conn)
 {
 	fprintf(stderr, "in bb-init\n");
-	log_msg("\nsfs_init()\n");
 
 
 	//log_conn(conn);
@@ -310,7 +309,6 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 
 			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x);",
 					path, statbuf);
-
 			retstat = -1;
 			//	errno = ENOENT;
 			//return retstat;
@@ -420,8 +418,6 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 
 				}	
 
-
-
 			}
 
 
@@ -429,29 +425,38 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 		// temp name did not match, search current directory
 		else {
 
+			fileControlBlock *root = &inodes[0];
 
-			fileControlBlock *tempFCB = curr;
+			//parent dir is string between previous set of slashes
+			char currChar = *( filePath + strlen(filePath) - 1);
+			BOOL slashFound = FALSE;
+			int offset = 0;
+			while(slashFound == FALSE){
+	
+				if(currChar == '/' || curr == '\0')
+					slashFound == TRUE;
 
-			fcbNode *currNode = tempFCB->dirContents; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
+				offset++;
+				currChar = *(filePath + strlen(filePath) - offset);
 
-
-			while(currNode != NULL){
-
-
-				if(strcmp(temp, currNode->fileOrDir->fileName) == 0){
-					// recursively search subdirectories
-					// will use the fcbNodes
-					return findFileOrDir(filePath + strlen(temp), currNode->fileOrDir, isDir);
-
-				}
-
-				currNode = currNode->next;
 			}
 
+			fileControlBlock *parent = findFileOrDir(currFCB->parentDir, root, TRUE);
+			fileControlBlock *currFCB = parent->dirContents[0]; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
 
+			int i = 0;
+			while(currFCB != NULL){
 
+				if(strcmp(temp, currFCB->fileName) == 0){
+					// recursively search subdirectories
+					return currFCB;
+				}
+				
+				i++;
+				currFCB = parent->dirContents[i];
+			
+			}
 		}
-
 
 		x++;
 	}
@@ -503,10 +508,6 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 			create_inode(IS_FILE ,path);			
 
-
-
-
-
 		} 
 		// open the inode
 		else {
@@ -533,28 +534,24 @@ int sfs_unlink(const char *path)
 			char* parentDname = &(fcbToUnlink->parentDir[0]);
 			if (parentDname != NULL) {
 				fileControlBlock *parentDir = findFileOrDir(parentDname, root, TRUE);
-				if ((parentDir != NULL) && (parentDir->dirContents != NULL)) {
-					fcbNode* LLstructure = parentDir->dirContents->head, *prev = NULL;
 
-					while (LLstructure != NULL) {
+				if ((parentDir != NULL) && (parentDir->dirContents[0] != NULL)) {
 
-						if (LLstructure->fileOrDir != NULL) {
-							char* nameOfCurr = &(LLstructure->fileOrDir->fileName[0]);
-							if (strcmp(nameOfCurr, &(fcbToUnlink->fileName[0])) == 0) {
-								if (LLstructure == LLstructure->head) {
-									LLstructure->head = LLstructure->next; //unless it's null, but let's not worry about that (now)
-								} else { 
-									prev = LLstructure->next;	
-								}
-								retstat = 0;
-							}
-						}
 
-						prev = LLstructure;
-						LLstructure = LLstructure->next;
+					// New code, just use array properties
+					int i = 0;
+					// find where parent points to the unlinked node
+					while (parentDir->dirContents[i] != fcbToUnlink) {
+						
+						parentDir->dirContents[i] = NULL;
+
 					}
+
+
 					//TODO: free block data.
 					//TODO: update the inode bitmap entry
+
+
 				} else {
 					log_msg("cannot get a handle on the parent directory\n OR parentDir is null so I can't get head");
 					errno = EIO;
@@ -676,48 +673,56 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 	int i =0;
 	while(i < sBlock->numDataBlocks)
 	{
+		// free inode space found!
 
 		// free inode space found!
-		if(sBlock->ibmap!=USED)
+		if(sBlock->ibmap[i]!=USED)
 		{
 
 			memcpy(&inodes[i].fileName, path, strlen(path));
 			inodes[i].fileSize = 0; //no data yet, still unknown
 
 			//parent dir is string between previous set of slashes
-			int firstSlash;
-			int secondSlash;
-			char curr = *path;
-			int numSlashesFound = 0;
-			int index = 0;
-			while(numSlashesFound != 2)
-			{
+			char curr = *( path + strlen(path) - 1);
+			BOOL slashFound = FALSE;
+			int offset = 0;
+			while(slashFound = FALSE){
+	
+				if(curr == '/' || curr == '\0')
+					slashFound == TRUE;
 
-				if(curr == '/' && numSlashesFound == 0){
-					numSlashesFound++;
-					firstSlash = index;
-				}
-				else if(curr == '/' && numSlashesFound == 1){
-					numSlashesFound++;
-					secondSlash = index;
-				}
-
-				curr = *(path + index);
-				index++;
+				offset++;
+				curr = *(path + strlen(path) - offset);
 
 			}
 
+			char *temp;
+			memcpy(temp, path, strlen(path) - offset );
 			// accounts for slashes
+			memcpy(&inodes[i].parentDir, path, strlen(path) - offset );
+			//find parent
+			fileControlBlock *parent = findFileOrDir(temp, findRootOrDieTrying(), TRUE);
 
-			memcpy(&inodes[i].parentDir, (path + firstSlash + 1), (secondSlash - 1) );
+			//check dirContents if empty, if so add to head
+			if(parent->dirContents == NULL){
+				//TODO malloc the pointers
+				parent->dirContents[0] = &inodes[i];
+				parent->dirContents[1] = NULL;
+			} else {
+				
+				//find next free space in array
+				int x = 0;
+				for(; x < MAX_FILES_IN_DIR; x++){
 
-			//handle linked list structure
-			fcbNode *prev = inodes[i - 1].dirContents;
-			fcbNode *currNode = inodes[i].dirContents;
-			prev->next = currNode;
-			currNode->fileOrDir = &inodes[i];
-			currNode->next = NULL;
-			//do we need to set head here!?
+					if(parent->dirContents[x] == NULL){
+						//TODO malloc the pointers
+						parent->dirContents[x] = &inodes[i];
+						parent->dirContents[x + 1] = NULL;
+					}
+
+				}
+
+			}
 
 			//set rest of inode fields
 			inodes[i].fileType = ftype;
@@ -737,11 +742,12 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 
 			inodes[i].uid = getuid();
 			inodes[i].time = time(NULL);
-			inodes[i].dirContents = currNode;
+			//inodes[i].dirContents = currNode; set at line 719
 			sBlock->ibmap[i]=USED;
 			return &inodes[i];
 		}
-			i++;
+			
+		i++;
 
 
 	}
@@ -830,13 +836,17 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 		log_msg("\n Could not find directory using path: %s \n", path);
 		return -1;
 	}
+	
+	// end condition if true
+	if(directory->dirContents == NULL)
+		return retstat;
 
-	fcbNode *curr = directory->dirContents;
-
+	fileControlBlock *curr = directory->dirContents[0];
+	int i = 1;
 	while(curr != NULL){
-		log_msg("\n inLoop: filler on \n", curr->fileOrDir->fileName);
-		filler(buf, curr->fileOrDir->fileName, NULL, 0);
-		curr = curr->next;
+		log_msg("\n inLoop: filler on \n", curr->fileName);
+		filler(buf, curr->fileName, NULL, 0);
+		curr = directory->dirContents[i];
 	}
 
 	return retstat;
