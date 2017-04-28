@@ -2,8 +2,9 @@
 #define __KNOTEN_H__
 
 
-#define MAX_BLOCKS 512
+#define MAX_BLOCKS 1024
 #define NAME_SIZE 256
+#define MAX_FILES_IN_DIR 30
 
 typedef enum {
 	
@@ -30,7 +31,6 @@ typedef enum {
 
 typedef struct fileControlBlock fileControlBlock;
 
-typedef struct fcbNode fcbNode;
 
 typedef struct {
 
@@ -49,27 +49,24 @@ struct fileControlBlock {
 
 	char fileName[NAME_SIZE];
 	long fileSize; // number of files in directory or size of actual file
-	char parentDir[NAME_SIZE];
+	char parentDir[NAME_SIZE]; //path of parent directory
 	fileType fileType;
 	short mode; //can this file be read/written/executed?
 	short uid; //who owns this file?
 	char block[60]; //a set of disk pointers (15 total)
 	long time; //what time was this file last accessed?
-	fcbNode *dirContents; //the file or directory linked list structure
+
+	//array of files/directories in the current directory
+	// null if no files
+	fileControlBlock **dirContents;
 	
 } ;
 
-struct fcbNode{
-
-	fileControlBlock *fileOrDir; //current fcb in list
-	fcbNode *head;
-	fcbNode *next;
-
-} ;
 
 
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir);
 fileControlBlock *findRootOrDieTrying();
+fileControlBlock *getParentFcb(fileControlBlock *child);
 
 fileControlBlock *create_inode(fileType type, char *filePath);
 int formatDisk(superblock *sBlock);

@@ -68,19 +68,6 @@ int inode_read(const int block_num, void *buf, int offset)
     return retstat;
 }
 
-int block_read_offset(const int block_num, void *buf, int offset)
-{
-    int retstat = 0;
-    retstat = pread(diskfile, buf, BLOCK_SIZE, block_num*BLOCK_SIZE + offset);
-    if (retstat <= 0){
-    memset(buf, 0, BLOCK_SIZE + offset);
-    if(retstat<0)
-    perror("block_read failed");
-    }
-
-    return retstat;
-}
-
 /** Write a block to an open file
  *
  * Write should return exactly @BLOCK_SIZE except on error. 
