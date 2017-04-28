@@ -70,6 +70,9 @@ fileControlBlock *getParentFcb(fileControlBlock *child);
 
 fileControlBlock *create_inode(fileType type, char *filePath);
 int formatDisk(superblock *sBlock);
+char *getRelativeParentName(char *filePath);
+
+
 void showInodeNames();
 
 int getFreeBlockNum();
