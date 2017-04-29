@@ -59,7 +59,7 @@ struct fileControlBlock {
 	//array of files/directories in the current directory
 	// null if no files
 	//TODO: CHANGE DIRCONTENTS TO FIXED ARRAY
-	fileControlBlock **dirContents;
+	fileControlBlock *dirContents[MAX_FILES_IN_DIR];
 	
 } ;
 
@@ -73,6 +73,7 @@ fileControlBlock *create_inode(fileType type, char *filePath);
 int formatDisk(superblock *sBlock);
 char *getRelativeParentName(char *filePath);
 BOOL remove_inode(fileType type, char *filePath);
+void initDirContents(fileControlBlock *fcb);
 
 void showInodeNames();
 

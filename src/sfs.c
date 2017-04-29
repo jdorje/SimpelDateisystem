@@ -52,10 +52,11 @@
 //TODO superblock (4KB)
 //TODO ibitmap (4KB) and data bitmap (4KB)
 
-fileControlBlock inodes[100];
+
 char *diskFile;
 superblock sBlockData;
 superblock *sBlock = &sBlockData;
+fileControlBlock inodes[100]; //TODO NEED TO CHANGE TO SUPERBLOCK INODES NUMBER
 int diskSize;
 
 
@@ -163,6 +164,16 @@ void *sfs_init(struct fuse_conn_info *conn)
 	return SFS_DATA;
 }
 
+void initDirContents(fileControlBlock *fcb){
+
+	int i = 0;
+	while(i < MAX_FILES_IN_DIR){
+
+		fcb->dirContents[i] = NULL;
+		i++;
+	}
+}
+
 /* Initializes the disk to the default
  *  and appropriate values
  *
@@ -206,7 +217,7 @@ int formatDisk(superblock *sBlock)
 
 	inodes[0].uid = getuid();
 	inodes[0].time = time(NULL);
-	inodes[0].dirContents = NULL;
+	initDirContents(&inodes[0]);
 
 	//write to disk
 	block_write_padded(0, sBlock, sizeof(superblock), 0);
@@ -232,7 +243,7 @@ int formatDisk(superblock *sBlock)
 
 		curr.uid = getuid();
 		curr.time = time(NULL);
-		curr.dirContents = NULL;
+		initDirContents(&curr);
 
 		sBlock->ibmap[i] = NOT_USED;
 
@@ -699,9 +710,7 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 				return NULL;		
 
 			} else if(parent->dirContents == NULL){
-				parent->dirContents = malloc(sizeof(fileControlBlock *) * 2);
 				parent->dirContents[0] = &inodes[i];
-				parent->dirContents[1] = NULL;
 			} else {
 
 				//find next free space in array
@@ -709,9 +718,8 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 				for(; x < MAX_FILES_IN_DIR; x++){
 
 					if(parent->dirContents[x] == NULL){
-						parent->dirContents[x] = malloc(sizeof(fileControlBlock *) * 2);
 						parent->dirContents[x] = &inodes[i];
-						parent->dirContents[x + 1] = NULL;
+						break;
 					}
 				}
 			}
