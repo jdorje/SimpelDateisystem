@@ -173,12 +173,26 @@ int formatDisk(superblock *sBlock)
 
 	//TODO: CALCULATE NUM INODES AT RUNTIME
 	int remainingSpace = diskSize;
+
+	//account for sblock space
+	remainingSpace -= BLOCK_SIZE;
+	int spaceUsed = 0;
+	int currAllocation = 0;
+	while(spaceUsed < remainingSpace){
+		currAllocation += (BLOCK_SIZE * 15 + (BLOCK_SIZE / sizeof(fileControlBlock))	);
+		
+		if(currAllocation < remainingSpace){
+			spaceUsed += currAllocation;
+			sBlock->numInodes++;
+			sBlock->numDataBlocks += 15;
+		}
+		else{
+			break;
+		}
+	}
+
 	// set up sBlock located in block 0
 	sBlock->magicNum = 666;
-	sBlock->numInodes = 64;
-	sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
-	
-
 	sBlock->inodeStartIndex = 1; // index of the first inode struct
 	sBlock->ibmap[0] = USED;
 	// set up root dir
