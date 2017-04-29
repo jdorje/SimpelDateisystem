@@ -709,6 +709,14 @@ int sfs_mkdir(const char *path, mode_t mode)
 	return retstat;
 }
 
+//TODO: implement this method, essentially the opposite of create_inode;
+BOOL remove_inode(fileType type, char *filePath){
+
+	
+
+
+	return FALSE;
+}
 
 /** Remove a directory */
 int sfs_rmdir(const char *path)
@@ -717,6 +725,11 @@ int sfs_rmdir(const char *path)
 	log_msg("sfs_rmdir(path=\"%s\")\n",
 			path);
 
+	if(remove_inode(IS_DIR, path) == FALSE){
+		errno = ENOENT;
+		retstat = errno;
+
+	}
 
 	return retstat;
 }
