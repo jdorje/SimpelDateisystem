@@ -43,8 +43,5 @@ struct fileControlBlock {
 	char block[60]; //a set of disk pointers (15 total)
 	long time; //what time was this file last accessed?
 
-	//array of files/directories in the current directory
-	// null if no files
-	//TODO: CHANGE DIRCONTENTS TO FIXED ARRAY
-	fileControlBlock **dirContents;
+	fileControlBlock *dirContents[MAX_FILES_IN_DIR];
 } ;
