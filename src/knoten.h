@@ -19,7 +19,6 @@ typedef enum {
 	FALSE
 } BOOL;
 
-
 typedef struct fileControlBlock fileControlBlock;
 typedef struct {
 
@@ -32,7 +31,6 @@ typedef struct {
 	status dbmap[MAX_BLOCKS];
 
 } superblock;
-
 
 struct fileControlBlock {
 
@@ -49,22 +47,4 @@ struct fileControlBlock {
 	// null if no files
 	//TODO: CHANGE DIRCONTENTS TO FIXED ARRAY
 	fileControlBlock **dirContents;
-	
 } ;
-
-
-
-fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir);
-fileControlBlock *findRootOrDieTrying();
-fileControlBlock *getParentFcb(fileControlBlock *child);
-
-fileControlBlock *create_inode(fileType type, const char *filePath);
-int formatDisk(superblock *sBlock);
-char *getRelativeParentName(const char *filePath);
-
-
-void showInodeNames();
-
-int getFreeDataBlockNum();
-int getFreeInodeNum();
-int createAllInodes();
