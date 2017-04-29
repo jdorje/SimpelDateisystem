@@ -52,11 +52,10 @@
 //TODO superblock (4KB)
 //TODO ibitmap (4KB) and data bitmap (4KB)
 
-
+fileControlBlock inodes[100];
 char *diskFile;
 superblock sBlockData;
 superblock *sBlock = &sBlockData;
-fileControlBlock inodes[100]; //TODO NEED TO CHANGE TO SUPERBLOCK INODES NUMBER
 int diskSize;
 
 
@@ -75,38 +74,33 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
-
-	// Create everything from the start
 	if(ret == 0){
-
+		log_msg("\n Did not block read anything so creating from the start. \n");
 		formatDisk(sBlock);
 
-	}
-	// see if filesystem already exists
-	else if( ret > 0){
-
+	} else if( ret > 0){
+		log_msg("\n Found something but formatting disk anyway. \n");
 		formatDisk(sBlock);
-		log_msg("\n Superblock loaded...\n");
 		memcpy(sBlock, buf, BLOCK_SIZE);
+		log_msg("\n Loaded disk contents (from before formatting) into sBlock. \n");
 		// check if file system matches ours
 		if(sBlock->magicNum == 666){
 			log_msg("\n Magic number MATCHES OURS.\n");
 		}
-		//convert to our file system
 		else {
-			log_msg("\n Magic number does not match.\n");
-			log_msg("\n The number received was: %d\n", sBlock->magicNum);
-
+			log_msg("\n Magic number %d does not match ours.\n", sBlock->magicNum);
 			//TODO impl method to convert fs to match ours
 		}
 
 		// read in root dir
-		if( inode_read(1, &inodes[0], 0) < 0)
+		if( inode_read(1, &inodes[0], 0) < 0) {
 			log_msg("\n Problem reading root dir! \n");
+		}
 
 		//i is equal to 1 since root is already created
 		int i = 1;
 		int endCond = sBlock->numInodes;
+		log_msg("\n endCond == sBlock->numInodes == %d \n", sBlock->numInodes);
 		// each block can fit 6 inodes
 		int currBlockFillNum = 1;
 		int currBlock = 1;
@@ -146,10 +140,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 
 			} else {
-
-
-				//log_msg("\n Error trying to block read inode[].\n");
-
+				log_msg("\n Error trying to block read inode[%d].\n", i);
 			}
 
 			i++;
@@ -164,26 +155,15 @@ void *sfs_init(struct fuse_conn_info *conn)
 	return SFS_DATA;
 }
 
-void initDirContents(fileControlBlock *fcb){
-
-	int i = 0;
-	while(i < MAX_FILES_IN_DIR){
-
-		fcb->dirContents[i] = NULL;
-		i++;
-	}
-}
-
 /* Initializes the disk to the default
  *  and appropriate values
  *
  */
 int formatDisk(superblock *sBlock)
 {
-	log_msg("\n Creating file system from scratch...\n");
-
 	//TODO: CALCULATE NUM INODES AT RUNTIME
 	int remainingSpace = diskSize;
+	log_msg("\n [formatDisk] remainingSpace == diskSize == %d \n", diskSize);
 
 	//account for sblock space
 	remainingSpace -= BLOCK_SIZE;
@@ -217,7 +197,7 @@ int formatDisk(superblock *sBlock)
 
 	inodes[0].uid = getuid();
 	inodes[0].time = time(NULL);
-	initDirContents(&inodes[0]);
+	inodes[0].dirContents = NULL;
 
 	//write to disk
 	block_write_padded(0, sBlock, sizeof(superblock), 0);
@@ -232,7 +212,6 @@ int formatDisk(superblock *sBlock)
 	int i = 1;
 	int endCond = sBlock->numInodes;
 	for(; i < (endCond - 1); i++){
-
 		fileControlBlock curr = inodes[i];
 		//TODO ENSURE THESE FIELDS ARE CORRECT
 		curr.fileName[0] = '\0';
@@ -243,7 +222,7 @@ int formatDisk(superblock *sBlock)
 
 		curr.uid = getuid();
 		curr.time = time(NULL);
-		initDirContents(&curr);
+		curr.dirContents = NULL;
 
 		sBlock->ibmap[i] = NOT_USED;
 
@@ -258,9 +237,6 @@ int formatDisk(superblock *sBlock)
 		} 
 
 	}
-
-
-
 }
 
 
@@ -284,20 +260,19 @@ void sfs_destroy(void *userdata)
  */
 int sfs_getattr(const char *path, struct stat *statbuf)
 {
-	int retstat = 0;
 	char fpath[PATH_MAX];
 
 	// check if path name is too long
 	if(strlen(path) > PATH_MAX) {
 		log_msg("\nName too long for me, oops\n");
 		errno = ENAMETOOLONG;
-		return -1;
+		return -errno;
 	}
 
 	if (statbuf == NULL) {
 		log_msg("\nWhat are you doing, statbuf is null\n");
 		errno = EIO;
-		return -1;
+		return -errno;
 	}
 
 	if(strcmp(path, "/.Trash") == 0 ||
@@ -320,21 +295,18 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		statbuf->st_ctime = 0;
 		statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
 		statbuf->st_blocks = 0;
-		retstat = 0;
+
+		log_msg("\n getattr() on trash or root (%s), returning success. \n", path);
+		return 0;
 	} else {
 
-		char *pLastSlash = strrchr(path, '/');
-		char *relativeName = pLastSlash ? pLastSlash : path;
-		// find file 
-		fileControlBlock *fileHandle = findFileOrDir(relativeName, findRootOrDieTrying(), FALSE);
-		if(fileHandle == NULL){
 
-			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x);",
-					path, statbuf);
-			retstat = -1;
-			//	errno = ENOENT;
-			//return retstat;
-			return -ENOENT;
+		// find file 
+		fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
+		if(fileHandle == NULL){
+			log_msg("\n [getattr] findFileOrDir could not find %s so returning ENOENT\n", path);
+			errno = ENOENT;
+			return -errno;
 		}
 
 		//modify attributes in statbuf according to the fileHandle
@@ -356,10 +328,9 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 	}
 
 
-	log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
+	log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x) success\n",
 			path, statbuf);
-
-	return retstat;	
+	return 0;	
 }
 
 /*
@@ -382,16 +353,32 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 		char *pLastSlash = strrchr(filePath, '/');
 		char *relativeName = pLastSlash ? pLastSlash : filePath;
 
-		// found the file name
-		//TODO CONFIRM PARENT DIRECTORY IS THE SAME ALSO
 		if(strcmp(currFCB->fileName, relativeName) == 0){
+
+			char* RelativeParentName = getRelativeParentName(filePath);
+			if (RelativeParentName != NULL) {
+				
+				char* currInodeParentName = &currFCB->parentDir[0];
+				if (currInodeParentName != NULL) {
+					if (strcmp(currInodeParentName, RelativeParentName) == 0) {
+						log_msg("\n [findFileOrDir] relativeName (%s) and RelativeParentName (%s) for inode %d match \n", relativeName, RelativeParentName, x);
+					} else {
+						log_msg("\n [findFileOrDir] given relativeName (%s) and found relativeName (%s) do not match but returning finding anyway. \n", relativeName, RelativeParentName);
+					}
+				}
+
+				free(RelativeParentName);
+			} else {
+				log_msg("\n [findFileOrDir] could not find relative parent name for %s \n", filePath);
+			}
+
 			return currFCB;
 		}
 
 		x++;
 	}
 
-	log_msg("\nENOENT: Component does not exist or is empty string.\n");
+	log_msg("\n [findFileOrDir] returnung NULL, calling function should give ENOENT\n");
 	return NULL;
 
 }
@@ -719,7 +706,9 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 				return NULL;		
 
 			} else if(parent->dirContents == NULL){
+				parent->dirContents = malloc(sizeof(fileControlBlock *) * 2);
 				parent->dirContents[0] = &inodes[i];
+				parent->dirContents[1] = NULL;
 			} else {
 
 				//find next free space in array
@@ -727,8 +716,9 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 				for(; x < MAX_FILES_IN_DIR; x++){
 
 					if(parent->dirContents[x] == NULL){
+						parent->dirContents[x] = malloc(sizeof(fileControlBlock *) * 2);
 						parent->dirContents[x] = &inodes[i];
-						break;
+						parent->dirContents[x + 1] = NULL;
 					}
 				}
 			}
@@ -779,14 +769,6 @@ int sfs_mkdir(const char *path, mode_t mode)
 	return retstat;
 }
 
-//TODO: implement this method, essentially the opposite of create_inode;
-BOOL remove_inode(fileType type, char *filePath){
-
-	
-
-
-	return FALSE;
-}
 
 /** Remove a directory */
 int sfs_rmdir(const char *path)
@@ -795,11 +777,6 @@ int sfs_rmdir(const char *path)
 	log_msg("sfs_rmdir(path=\"%s\")\n",
 			path);
 
-	if(remove_inode(IS_DIR, path) == FALSE){
-		errno = ENOENT;
-		retstat = errno;
-
-	}
 
 	return retstat;
 }
