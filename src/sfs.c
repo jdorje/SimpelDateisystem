@@ -74,7 +74,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
-	
+
 	// Create everything from the start
 	if(ret == 0){
 
@@ -102,7 +102,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 		// read in root dir
 		if( inode_read(1, &inodes[0], 0) < 0)
 			log_msg("\n Problem reading root dir! \n");
-		
+
 		//i is equal to 1 since root is already created
 		int i = 1;
 		int endCond = sBlock->numInodes;
@@ -112,7 +112,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 		while(i < endCond){
 
 			int isSucc = inode_read(currBlock, &inodes[i], 
-				currBlockFillNum * sizeof(fileControlBlock) );
+					currBlockFillNum * sizeof(fileControlBlock) );
 			//log_msg("\n Reading inodes...\n");
 
 			if(isSucc){
@@ -164,9 +164,9 @@ void *sfs_init(struct fuse_conn_info *conn)
 }
 
 /* Initializes the disk to the default
-*  and appropriate values
-*
-*/
+ *  and appropriate values
+ *
+ */
 int formatDisk(superblock *sBlock)
 {
 	log_msg("\n Creating file system from scratch...\n");
@@ -233,11 +233,11 @@ int formatDisk(superblock *sBlock)
 		curr.uid = getuid();
 		curr.time = time(NULL);
 		curr.dirContents = NULL;
-			
+
 		sBlock->ibmap[i] = NOT_USED;
 
 		block_write_padded( currBlock, &inodes[i], 
-			sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
+				sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
 
 		//NEED BLOCK WRITE HERE FOR THE INODES
 		currBlockFillNum++;
@@ -368,7 +368,7 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 
 		fileControlBlock *currFCB = &inodes[x];
 		char *pLastSlash = strrchr(filePath, '/');
-	    	char *relativeName = pLastSlash ? pLastSlash : filePath;
+		char *relativeName = pLastSlash ? pLastSlash : filePath;
 
 		// found the file name
 		//TODO CONFIRM PARENT DIRECTORY IS THE SAME ALSO
@@ -387,7 +387,7 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 fileControlBlock *findRootOrDieTrying()
 {
 	fileControlBlock *root = &inodes[0];
-	
+
 	if (root == NULL) {
 		log_msg("\n ROOT is NULL\n");
 		return NULL;
@@ -460,7 +460,7 @@ int sfs_unlink(const char *path)
 					int i = 0;
 					// find where parent points to the unlinked node
 					while (parentDir->dirContents[i] != fcbToUnlink) {
-						
+
 						parentDir->dirContents[i] = NULL;
 						i++;
 					}
@@ -588,21 +588,64 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 
 
 
+/**
+ * Input: /home/bob/file.txt, /hi.txt
+ * Output: bob, /
+ */
+char *getRelativeParentName(char *filePath)
+{
+	if (filePath != NULL) {
+		char *fromLastSlash = strrchr(filePath, '/');
+		if (fromLastSlash != NULL) {
+			char *absoluteParentName = malloc(sizeof(char) * strlen(filePath));
+			if (absoluteParentName != NULL) {
 
-char *getRelativeParentName(char *filePath){
+				int lenAbsParent = strlen(filePath) - strlen(fromLastSlash);
+				if (lenAbsParent == 0) {
+					char* r00t = malloc(sizeof(char)*2);
+					if (r00t != NULL) { 
+						strncpy(r00t, "/", 2);
+						log_msg(" \n getRelativeParentName called on %s, returned %s \n", filePath, r00t);
+						return r00t;
+					} else {
+						log_msg("\n 2 byte malloc failed, what is life \n");
+					}
+				} else {
 
-	char *pLastSlash = strrchr(filePath, '/');
-	char *relativeName = pLastSlash ? pLastSlash : filePath;		
+					strncpy(absoluteParentName, filePath, lenAbsParent);
+					char *fromLastSlashInAP = strrchr(absoluteParentName, '/');
+					if (fromLastSlashInAP != NULL) {
+						char* relativeParentName = malloc(sizeof(char) * strlen(fromLastSlashInAP));
+						if (relativeParentName != NULL) {
+							char* RelativeParentName = strcpy(relativeParentName, fromLastSlashInAP);
+							log_msg(" \n getRelativeParentName called on %s, returned %s \n", filePath, RelativeParentName);
+							return RelativeParentName;
+						} else {
+							log_msg(" \n could not malloc for relativeParentName\n");
+						}
+					} else {
+						char* r00t = malloc(sizeof(char)*2);
+						if (r00t != NULL) {
+							strncpy(r00t, "/", 2);
+							log_msg(" \n getRelativeParentName called on %s, returned %s \n", filePath, r00t);
+							return r00t;
+						} else {
+							log_msg("\n (version 2) 2 byte malloc failed\n");
+						}
+					}
+				}
+			} else {
+				log_msg("\n could not malloc for absoluteParentName \n");
+			}
+		} else {
+			log_msg("\n Wrong file name, path always needs slash\n");
+		} 
+	} else {
+		log_msg("\nfilePath give nto getRelativeParentName is NULL\n");
+	}
 
-	char *absoluteParentName = malloc(sizeof(char) * strlen(filePath));
-	memcpy(absoluteParentName, filePath, strlen(filePath) - strlen(relativeName));
-
-	char *pLastSlashForParent = strrchr(absoluteParentName, '/');
-	char *relativeParentName = pLastSlashForParent ? pLastSlashForParent : absoluteParentName;		
-
-	return relativeParentName;
-	
-
+	log_msg("\n returned NULL \n");
+	return NULL;
 }
 
 int getFreeInodeNum(superblock *sBlock){
@@ -621,6 +664,7 @@ int getFreeInodeNum(superblock *sBlock){
 fileControlBlock *create_inode(fileType ftype, char * path)
 {
 	int i =0;
+	fileControlBlock *parent = NULL;
 	while(i < sBlock->numDataBlocks)
 	{
 
@@ -629,16 +673,25 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 		if(sBlock->ibmap[i]!=USED)
 		{
 			char *pLastSlash = strrchr(path, '/');
-    			char *relativeName = pLastSlash ? pLastSlash : path;
+			char *relativeName = pLastSlash ? pLastSlash : path;
 
-			
+
 			memcpy(&inodes[i].fileName, relativeName, strlen(relativeName));
 			inodes[i].fileSize = 0; //no data yet, still unknown
 
 			char *parentName = getRelativeParentName(path);
-			memcpy(&inodes[i].parentDir, parentName, sizeof(parentName));
-			//find parent
-			fileControlBlock *parent = findFileOrDir(parentName, findRootOrDieTrying(), TRUE);
+			if (parentName != NULL)
+			{
+				memcpy(&inodes[i].parentDir, parentName, strlen(parentName));
+				//find parent
+				parent = findFileOrDir(parentName, findRootOrDieTrying(), TRUE);
+				free(parentName);
+			}			
+			else
+			{
+				log_msg("\ncould not get relative parent name for %s\n", path);
+			}	
+
 
 			//check dirContents if empty, if so add to head
 			if(parent == NULL){
@@ -650,7 +703,7 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 				parent->dirContents[0] = &inodes[i];
 				parent->dirContents[1] = NULL;
 			} else {
-				
+
 				//find next free space in array
 				int x = 0;
 				for(; x < MAX_FILES_IN_DIR; x++){
@@ -685,7 +738,7 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 			sBlock->ibmap[i]=USED;
 			return &inodes[i];
 		}
-			
+
 		i++;
 
 
@@ -788,7 +841,7 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 		log_msg("\n Could not find directory using path: %s \n", path);
 		return -1;
 	}
-	
+
 	// end condition if true
 	if(directory->dirContents == NULL)
 		return retstat;
@@ -798,6 +851,7 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 	while(curr != NULL){
 		log_msg("\n inLoop: filler on \n", curr->fileName);
 		filler(buf, curr->fileName, NULL, 0);
+		i++;
 		curr = directory->dirContents[i];
 	}
 
