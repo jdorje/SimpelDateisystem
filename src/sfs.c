@@ -56,6 +56,7 @@ fileControlBlock inodes[100];
 char *diskFile;
 superblock sBlockData;
 superblock *sBlock = &sBlockData;
+int diskSize;
 
 
 void *sfs_init(struct fuse_conn_info *conn)
@@ -67,23 +68,23 @@ void *sfs_init(struct fuse_conn_info *conn)
 	//log_fuse_context(fuse_get_context());
 	disk_open(diskFile);
 	char buf[BLOCK_SIZE];
+	struct stat st;
+	stat(diskFile, &st);
+	diskSize = st.st_size;
 
 	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
 	
 	// Create everything from the start
 	if(ret == 0){
-		int x = 1024 * 1024 - 1;
-        FILE *fp = fopen("../output.file", "w");
-        fseek(fp, x , SEEK_SET);
-        fputc('\0', fp);
-        
+
 		formatDisk(sBlock);
 
 	}
 	// see if filesystem already exists
 	else if( ret > 0){
 
+		formatDisk(sBlock);
 		log_msg("\n Superblock loaded...\n");
 		memcpy(sBlock, buf, BLOCK_SIZE);
 		// check if file system matches ours
@@ -101,7 +102,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 		// read in root dir
 		if( inode_read(1, &inodes[0], 0) < 0)
 			log_msg("\n Problem reading root dir! \n");
-
+		
 		//i is equal to 1 since root is already created
 		int i = 1;
 		int endCond = sBlock->numInodes;
@@ -116,27 +117,23 @@ void *sfs_init(struct fuse_conn_info *conn)
 
 			if(isSucc){
 				//check types of files, ex. data vs directory
-				fileControlBlock fcb = inodes[i];
+				fileControlBlock *fcb = &inodes[i];
 
 				//check if dir 
-
-				if(fcb.fileType == IS_DIR){
+				if(fcb->fileType == IS_DIR){
 
 					//log_msg("\n dir found.\n");
 					//block_write_padded(i, &fcb, sizeof(fileControlBlock));			
 				} 
 				//check if we have file
-				else if(fcb.fileType == IS_FILE){
-
-					//log_msg("\n file found.\n");
+				else if(fcb->fileType == IS_FILE){
 
 					// set the data bmap
-					if(fcb.fileSize < 1)
+					if(fcb->fileSize < 1)
 						sBlock->dbmap[i] = NOT_USED;
 					else
 						sBlock->dbmap[i] = USED;
 
-					//block_write_padded(i, &fcb, sizeof(fileControlBlock));			
 
 				}
 
@@ -166,16 +163,24 @@ void *sfs_init(struct fuse_conn_info *conn)
 	return SFS_DATA;
 }
 
+/* Initializes the disk to the default
+*  and appropriate values
+*
+*/
 int formatDisk(superblock *sBlock)
 {
 	log_msg("\n Creating file system from scratch...\n");
 
+	//TODO: CALCULATE NUM INODES AT RUNTIME
+	int remainingSpace = diskSize;
 	// set up sBlock located in block 0
 	sBlock->magicNum = 666;
 	sBlock->numInodes = 64;
 	sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
-	sBlock->inodeStartIndex = 1; // index of the first inode struct
 	
+
+	sBlock->inodeStartIndex = 1; // index of the first inode struct
+	sBlock->ibmap[0] = USED;
 	// set up root dir
 
 	inodes[0].fileName[0] = '/';
@@ -214,6 +219,8 @@ int formatDisk(superblock *sBlock)
 		curr.uid = getuid();
 		curr.time = time(NULL);
 		curr.dirContents = NULL;
+			
+		sBlock->ibmap[i] = NOT_USED;
 
 		block_write_padded( currBlock, &inodes[i], 
 			sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
@@ -227,19 +234,8 @@ int formatDisk(superblock *sBlock)
 
 	}
 
-	//********************************
 
 
-	block_write_padded(0, sBlock, sizeof(superblock));
-	block_write_padded(1, &inodes[0], sizeof(fileControlBlock));
-
-	sBlock->ibmap[0]=USED;
-
-	/* TODO: lookup these fields and assign to root dir appropriately
-	   short; //can this file be read/written/executed?
-	   char block[60]; //a set of disk pointers (15 total)
-	   long time; //what time was this file last accessed?
-	   */
 }
 
 
@@ -353,82 +349,17 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 		return findRootOrDieTrying();
 	}
 
-	if(strlen(filePath) <  2) 
-		log_msg("\nEIO\n");
-
-	BOOL found = FALSE;
-	BOOL lastToken = FALSE;
-	char *temp = malloc(sizeof(char) * strlen(filePath));
-	//add one to account for forward slash
-
-	
-	char *pLastSlash = strrchr(filePath, '/');
-     char *fileBaseName = pLastSlash ? pLastSlash + 1 : filePath;
-
 	int x = 0;
-	while(found == FALSE && x < sBlock->numInodes){
-
+	while(x < sBlock->numInodes){
 
 		fileControlBlock *currFCB = &inodes[x];
+		char *pLastSlash = strrchr(filePath, '/');
+	    	char *relativeName = pLastSlash ? pLastSlash : filePath;
+
 		// found the file name
-		if(strcmp(currFCB->fileName, fileBaseName) == 0){
-
-			if(lastToken == TRUE){
-				//check if dir or not
-				if(currFCB->fileType == IS_DIR && isDir == TRUE){
-					found = TRUE;
-					return currFCB;
-				} else if(currFCB->fileType == IS_FILE && isDir == FALSE){
-
-					//end condition HERE, this is what we want
-					found = TRUE;
-					return currFCB;
-
-				}	
-
-			} else if(lastToken == FALSE){
-				//check if dir or not
-
-				if(currFCB->fileType == IS_DIR){
-
-
-					// recursively search subdirectories
-					// will use the fcbNodes
-					return findFileOrDir(filePath + strlen(fileBaseName), currFCB, isDir);
-
-
-				} else if(currFCB->fileType == IS_FILE){
-
-					//error file name in middle of path name
-					log_msg("\nENOTDIR: A component in the path prefix is not a directory.\n");
-
-				}	
-
-			}
-
-
-		} 
-		// temp name did not match, search current directory
-		else {
-
-			fileControlBlock *root = findRootOrDieTrying();
-
-
-			fileControlBlock *parent = findFileOrDir(currFCB->parentDir, root, TRUE);
-			fileControlBlock *currNode = parent->dirContents[0]; //NEED TO ACCOUNT FOR FILES BC DIRCONTENTS WILL BE NULL
-
-			int i = 0;
-			while(currNode != NULL){
-
-				if(strcmp(fileBaseName, currNode->fileName) == 0){
-					// recursively search subdirectories
-					return currFCB;
-				}
-				
-				i++;
-				currNode = parent->dirContents[i];
-			
-			}
+		//TODO CONFIRM PARENT DIRECTORY IS THE SAME ALSO
+		if(strcmp(currFCB->fileName, relativeName) == 0){
+			return currFCB;
 		}
 
 		x++;
@@ -517,7 +448,7 @@ int sfs_unlink(const char *path)
 					while (parentDir->dirContents[i] != fcbToUnlink) {
 						
 						parentDir->dirContents[i] = NULL;
-
+						i++;
 					}
 
 
@@ -644,42 +575,64 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 
 
 
+char *getRelativeParentName(char *filePath){
+
+	char *pLastSlash = strrchr(filePath, '/');
+	char *relativeName = pLastSlash ? pLastSlash : filePath;		
+
+	char *absoluteParentName = malloc(sizeof(char) * strlen(filePath));
+	memcpy(absoluteParentName, filePath, strlen(filePath) - strlen(relativeName));
+
+	char *pLastSlashForParent = strrchr(absoluteParentName, '/');
+	char *relativeParentName = pLastSlashForParent ? pLastSlashForParent : absoluteParentName;		
+
+	return relativeParentName;
+	
+
+}
+
+int getFreeInodeNum(superblock *sBlock){
+
+	int i = 0;
+	for(; i < sBlock->numInodes; i++){
+		if(sBlock->ibmap[i] == NOT_USED)
+			return i;
+	}
+
+	//no more free inodes
+	return -1;
+}
+
+
 fileControlBlock *create_inode(fileType ftype, char * path)
 {
 	int i =0;
 	while(i < sBlock->numDataBlocks)
 	{
+
+		//TODO ENSURE BMAPS ARE SET PROPERLY
 		// free inode space found!
 		if(sBlock->ibmap[i]!=USED)
 		{
+			char *pLastSlash = strrchr(path, '/');
+    			char *relativeName = pLastSlash ? pLastSlash : path;
 
-			memcpy(&inodes[i].fileName, path, strlen(path));
+			
+			memcpy(&inodes[i].fileName, relativeName, strlen(relativeName));
 			inodes[i].fileSize = 0; //no data yet, still unknown
 
-			//parent dir is string between previous set of slashes
-			char curr = *( path + strlen(path) - 1);
-			BOOL slashFound = FALSE;
-			int offset = 0;
-			while(slashFound = FALSE){
-	
-				if(curr == '/' || curr == '\0')
-					slashFound == TRUE;
-
-				offset++;
-				curr = *(path + strlen(path) - offset);
-
-			}
-
-			char *temp;
-			memcpy(temp, path, strlen(path) - offset );
-			// accounts for slashes
-			memcpy(&inodes[i].parentDir, path, strlen(path) - offset );
+			char *parentName = getRelativeParentName(path);
+			memcpy(&inodes[i].parentDir, parentName, sizeof(parentName));
 			//find parent
-			fileControlBlock *parent = findFileOrDir(temp, findRootOrDieTrying(), TRUE);
+			fileControlBlock *parent = findFileOrDir(parentName, findRootOrDieTrying(), TRUE);
 
 			//check dirContents if empty, if so add to head
-			if(parent->dirContents == NULL){
-				//TODO malloc the pointers
+			if(parent == NULL){
+				log_msg("\n Could not find the parent file control block \n");
+				return NULL;		
+
+			} else if(parent->dirContents == NULL){
+				parent->dirContents = malloc(sizeof(fileControlBlock *) * 2);
 				parent->dirContents[0] = &inodes[i];
 				parent->dirContents[1] = NULL;
 			} else {
@@ -689,13 +642,11 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 				for(; x < MAX_FILES_IN_DIR; x++){
 
 					if(parent->dirContents[x] == NULL){
-						//TODO malloc the pointers
+						parent->dirContents[x] = malloc(sizeof(fileControlBlock *) * 2);
 						parent->dirContents[x] = &inodes[i];
 						parent->dirContents[x + 1] = NULL;
 					}
-
 				}
-
 			}
 
 			//set rest of inode fields
