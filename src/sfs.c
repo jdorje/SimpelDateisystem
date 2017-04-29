@@ -323,9 +323,10 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		retstat = 0;
 	} else {
 
-
+		char *pLastSlash = strrchr(path, '/');
+		char *relativeName = pLastSlash ? pLastSlash : path;
 		// find file 
-		fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
+		fileControlBlock *fileHandle = findFileOrDir(relativeName, findRootOrDieTrying(), FALSE);
 		if(fileHandle == NULL){
 
 			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x);",
