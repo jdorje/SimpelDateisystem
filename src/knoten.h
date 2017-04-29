@@ -1,37 +1,26 @@
-#ifndef __KNOTEN_H__
-#define __KNOTEN_H__
-
+#pragma once
 
 #define MAX_BLOCKS 1024
 #define NAME_SIZE 256
 #define MAX_FILES_IN_DIR 30
 
 typedef enum {
-	
-
 	IS_FILE,
 	IS_DIR
-
 } fileType;
 
 typedef enum {
-	
 	NOT_USED,
 	USED
-
 } status;
 
 typedef enum {
-	
 	TRUE,
 	FALSE
-
 } BOOL;
 
 
 typedef struct fileControlBlock fileControlBlock;
-
-
 typedef struct {
 
 	int magicNum; //fat32, ext2 etc.
@@ -59,7 +48,7 @@ struct fileControlBlock {
 	//array of files/directories in the current directory
 	// null if no files
 	//TODO: CHANGE DIRCONTENTS TO FIXED ARRAY
-	fileControlBlock *dirContents[MAX_FILES_IN_DIR];
+	fileControlBlock **dirContents;
 	
 } ;
 
@@ -69,16 +58,13 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 fileControlBlock *findRootOrDieTrying();
 fileControlBlock *getParentFcb(fileControlBlock *child);
 
-fileControlBlock *create_inode(fileType type, char *filePath);
+fileControlBlock *create_inode(fileType type, const char *filePath);
 int formatDisk(superblock *sBlock);
-char *getRelativeParentName(char *filePath);
-BOOL remove_inode(fileType type, char *filePath);
-void initDirContents(fileControlBlock *fcb);
+char *getRelativeParentName(const char *filePath);
+
 
 void showInodeNames();
 
 int getFreeDataBlockNum();
 int getFreeInodeNum();
 int createAllInodes();
-
-#endif
