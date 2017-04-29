@@ -58,6 +58,7 @@ struct fileControlBlock {
 
 	//array of files/directories in the current directory
 	// null if no files
+	//TODO: CHANGE DIRCONTENTS TO FIXED ARRAY
 	fileControlBlock **dirContents;
 	
 } ;
@@ -75,7 +76,7 @@ char *getRelativeParentName(char *filePath);
 
 void showInodeNames();
 
-int getFreeBlockNum();
+int getFreeDataBlockNum();
 int getFreeInodeNum();
 int createAllInodes();
 

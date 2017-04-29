@@ -56,6 +56,7 @@ fileControlBlock inodes[100];
 char *diskFile;
 superblock sBlockData;
 superblock *sBlock = &sBlockData;
+int diskSize;
 
 
 void *sfs_init(struct fuse_conn_info *conn)
@@ -67,6 +68,9 @@ void *sfs_init(struct fuse_conn_info *conn)
 	//log_fuse_context(fuse_get_context());
 	disk_open(diskFile);
 	char buf[BLOCK_SIZE];
+	struct stat st;
+	stat(diskFile, &st);
+	diskSize = st.st_size;
 
 	int ret = block_read(0, buf);
 	log_msg("\n First block read result: %d \n", ret);
@@ -80,6 +84,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 	// see if filesystem already exists
 	else if( ret > 0){
 
+		formatDisk(sBlock);
 		log_msg("\n Superblock loaded...\n");
 		memcpy(sBlock, buf, BLOCK_SIZE);
 		// check if file system matches ours
@@ -97,7 +102,7 @@ void *sfs_init(struct fuse_conn_info *conn)
 		// read in root dir
 		if( inode_read(1, &inodes[0], 0) < 0)
 			log_msg("\n Problem reading root dir! \n");
-
+		
 		//i is equal to 1 since root is already created
 		int i = 1;
 		int endCond = sBlock->numInodes;
@@ -113,7 +118,6 @@ void *sfs_init(struct fuse_conn_info *conn)
 			if(isSucc){
 				//check types of files, ex. data vs directory
 				fileControlBlock *fcb = &inodes[i];
-
 
 				//check if dir 
 				if(fcb->fileType == IS_DIR){
@@ -167,10 +171,14 @@ int formatDisk(superblock *sBlock)
 {
 	log_msg("\n Creating file system from scratch...\n");
 
+	//TODO: CALCULATE NUM INODES AT RUNTIME
+	int remainingSpace = diskSize;
 	// set up sBlock located in block 0
 	sBlock->magicNum = 666;
 	sBlock->numInodes = 64;
 	sBlock->numDataBlocks = 45000; //TODO: CALCULATE EXACT NUMBER OF BLOCKS USING THE SIZE OF THE STRUCTS
+	
+
 	sBlock->inodeStartIndex = 1; // index of the first inode struct
 	sBlock->ibmap[0] = USED;
 	// set up root dir
@@ -563,6 +571,9 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 
 	return bytes_written;
 }
+
+
+
 
 char *getRelativeParentName(char *filePath){
 
