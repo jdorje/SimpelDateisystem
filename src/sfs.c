@@ -329,7 +329,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		fileControlBlock *fileHandle = findFileOrDir(relativeName, findRootOrDieTrying(), FALSE);
 		if(fileHandle == NULL){
 
-			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%08x);",
+			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%---------08x);",
 					path, statbuf);
 			retstat = -1;
 			//	errno = ENOENT;
