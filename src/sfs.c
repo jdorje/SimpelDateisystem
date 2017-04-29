@@ -155,6 +155,14 @@ void *sfs_init(struct fuse_conn_info *conn)
 	return SFS_DATA;
 }
 
+void initDirContents(fileControlBlock *fcb) {
+	int i = 0;
+	while (i < MAX_FILES_IN_DIR) {
+		fcb->dirContents[i] = NULL;
+		i++;
+	}
+}
+
 /* Initializes the disk to the default
  *  and appropriate values
  *
@@ -197,7 +205,7 @@ int formatDisk(superblock *sBlock)
 
 	inodes[0].uid = getuid();
 	inodes[0].time = time(NULL);
-	inodes[0].dirContents = NULL;
+	initDirContents(&inodes[0]);
 
 	//write to disk
 	block_write_padded(0, sBlock, sizeof(superblock), 0);
@@ -222,7 +230,7 @@ int formatDisk(superblock *sBlock)
 
 		curr.uid = getuid();
 		curr.time = time(NULL);
-		curr.dirContents = NULL;
+		initDirContents(&curr);
 
 		sBlock->ibmap[i] = NOT_USED;
 
@@ -299,10 +307,8 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		log_msg("\n getattr() on trash or root (%s), returning success. \n", path);
 		return 0;
 	} else {
-
-
-		// find file 
-		fileControlBlock *fileHandle = findFileOrDir(path, &inodes[0], FALSE);
+		// find file: note, findFileOrDir already strips this path to relative name, you don't need to do it here
+		fileControlBlock *fileHandle = findFileOrDir(path, findRootOrDieTrying(), FALSE);
 		if(fileHandle == NULL){
 			log_msg("\n [getattr] findFileOrDir could not find %s so returning ENOENT\n", path);
 			errno = ENOENT;
@@ -334,8 +340,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 }
 
 /*
- *  Finds the specific file control block for the given
- *   file path passed in the parameter
+ *  findFileOrDir ASSUMES YOU ARE GIVEN AN ABSOLUTE PATH NAME AND STRIPS IT DOWN TO RELATIVE NAME
  */
 
 fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir){
@@ -706,9 +711,7 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 				return NULL;		
 
 			} else if(parent->dirContents == NULL){
-				parent->dirContents = malloc(sizeof(fileControlBlock *) * 2);
 				parent->dirContents[0] = &inodes[i];
-				parent->dirContents[1] = NULL;
 			} else {
 
 				//find next free space in array
@@ -716,9 +719,8 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 				for(; x < MAX_FILES_IN_DIR; x++){
 
 					if(parent->dirContents[x] == NULL){
-						parent->dirContents[x] = malloc(sizeof(fileControlBlock *) * 2);
 						parent->dirContents[x] = &inodes[i];
-						parent->dirContents[x + 1] = NULL;
+						break;
 					}
 				}
 			}
@@ -769,6 +771,9 @@ int sfs_mkdir(const char *path, mode_t mode)
 	return retstat;
 }
 
+BOOL remove_inode(fileType type, char *filePath) {
+	return FALSE;
+}
 
 /** Remove a directory */
 int sfs_rmdir(const char *path)
@@ -777,6 +782,10 @@ int sfs_rmdir(const char *path)
 	log_msg("sfs_rmdir(path=\"%s\")\n",
 			path);
 
+	if (remove_inode(IS_DIR, path) == FALSE) {
+		errno = ENOENT;
+		retstat = errno;
+	}
 
 	return retstat;
 }
