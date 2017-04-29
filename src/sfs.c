@@ -586,7 +586,15 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	if (root != NULL) {
 		fileControlBlock *fc = findFileOrDir(path, root, FALSE);
 		if (fc != NULL) {
-			int i = 0;
+			int size_of_data_block = 4096;
+			int how_many_pointers = sizeof(fc->block)/sizeof(fc->block[0]); //15
+			int capacity = how_many_pointers * size_of_data_block;
+			if (size <= capacity) {
+				int i = 0;
+			} else {
+				log_msg("\n you're asking to write more than this file sytem can support \n");
+				errno = EFBIG;
+			}
 		} else {
 			log_msg("\n cannot find the file \n");
 			errno = ENOENT;
