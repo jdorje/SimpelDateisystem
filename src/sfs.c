@@ -388,6 +388,16 @@ int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 	log_msg("\nsfs_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 			path, buf, size, offset, fi);
 
+        fileControlBlock *fc = findFileOrDir(path, FALSE);
+        if (fc != NULL) {
+
+		log_msg("\n [sfs_read] to be implemented \n");
+
+        } else {
+                log_msg("\n [sfs_read] cannot find the file \n");
+                errno = ENOENT;
+		return -errno;
+        }
 
 	return retstat;
 }
