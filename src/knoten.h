@@ -26,6 +26,7 @@ typedef struct {
 	int numInodes; //total number of inodes
 	int numDataBlocks; // total number of data blocks
 	int inodeStartIndex; //the index of the start of the first inode
+	int datablockStartIndex; //the index of the start of the first data block
 	
 	status ibmap[MAX_BLOCKS];
 	status dbmap[MAX_BLOCKS];
