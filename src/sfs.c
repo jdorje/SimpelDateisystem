@@ -425,7 +425,14 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 		int capacity = how_many_pointers * size_of_data_block;
 		if (size <= capacity) {
 			log_msg("\n [sfs_write] size %d less than capacity %d, returning success\n", size, capacity);
+
+			//If this requires writing more than fc->numBlocks, allocate new blocks
+
 			int i = 0;
+			for(; i < fc->numBlocks; i++) {
+				
+			}
+
 		} else {
 			log_msg("\n [sfs_write] you're asking to write more than this file sytem can support \n");
 			errno = EFBIG;

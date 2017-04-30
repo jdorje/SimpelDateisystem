@@ -103,10 +103,39 @@ int getFreeInodeNum(superblock *sBlock)
 	return -1;
 }
 
+BOOL add_to_direntry(fileControlBlock* parent, fileControlBlock *child)
+{
+	if ((parent != NULL) && (child != NULL))
+	{
+		if (parent->dirContents == NULL) {
+			log_msg("\n [add_to_direntry] adding new inode to head of parent directory contents \n");
+			parent->dirContents[0] = child;
+		} else {
+			int i;
+			for(i = 0; i < MAX_FILES_IN_DIR; i++) {
+				if (parent->dirContents[i] == NULL) {
+					parent->dirContents[i] = &inodes[i];
+					break;
+				}		
+			}
+
+			if (i > MAX_FILES_IN_DIR) {
+				log_msg("\n [add_to_direntry] more than the maximum files allowed in this entry! \n");
+				return FALSE;
+			} else {
+				log_msg("\n [add_to_direntry] replaced parent directory entry %d with new inode \n", i);
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
+}
+
 // create_inode assumes it is given an absolute path, which it converts to relative
 fileControlBlock *create_inode(fileType ftype, const char * path)
 {
-	int i =0;
+	int i =1;
 	fileControlBlock *parent = NULL;
 	while(i < sBlock->numDataBlocks)
 	{
@@ -135,19 +164,11 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 			if(parent == NULL){
 				log_msg("\n [create_inode] Could not find the parent file control block \n");
 				return NULL;		
-			} else if(parent->dirContents == NULL){
-				log_msg("\n [create_inode] adding new inode to head of parent directory contents \n");
-				parent->dirContents[0] = &inodes[i];
 			} else {
-				int x = 0;
-				for(; x < MAX_FILES_IN_DIR; x++){
-
-					if(parent->dirContents[x] == NULL){
-						parent->dirContents[x] = &inodes[i];
-						break;
-					}
+				if (!add_to_direntry(parent, &inodes[i])) {
+					log_msg("\n [create_inode] Could not add new inode to parent directory entry \n");
+					return NULL;
 				}
-				log_msg("\n [create_inode] replaced parent directory entry %d with new inode\n", x);
 			}
 
 			inodes[i].fileType = ftype;
