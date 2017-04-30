@@ -265,12 +265,12 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 	fileControlBlock *inode = findFileOrDir(path, FALSE);
 	if(inode == NULL)
 	{
-		log_msg("\n[sfs_create]  %s not found, passing to create_inode\n", path);
+		log_msg("\n [sfs_create] %s not found, passing to create_inode\n", path);
 		create_inode(IS_FILE ,path);			
 	} 
 	// open the inode
 	else {
-		log_msg("\n[sfs_create] %s found, should I call open? Doing nothing but returning success \n", path);
+		log_msg("\n [sfs_create] %s found, should I call open? Doing nothing but returning success \n", path);
 		//TODO: how to open a file??
 	}
 
@@ -431,7 +431,7 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 /** Create a directory */
 int sfs_mkdir(const char *path, mode_t mode)
 {
-	log_msg("\n[sfs_mkdir] passing %s directly to create_inode", path);
+	log_msg("\n [sfs_mkdir] passing %s directly to create_inode \n", path);
 
 	if (create_inode(IS_DIR, path) != NULL) {
 		return 0;
@@ -464,12 +464,18 @@ int sfs_rmdir(const char *path)
  */
 int sfs_opendir(const char *path, struct fuse_file_info *fi)
 {
-	int retstat = 0;
-	log_msg("\nsfs_opendir(path=\"%s\", fi=0x%08x)\n",
-			path, fi);
 
+        fileControlBlock *fcb = findFileOrDir(path, TRUE);
+        if (fcb != NULL) {
+                log_msg("\n [sfs_opendir] found %s, return success \n", path);
+                return 0;
+        } else {
+                log_msg("\n [sfs_opendir] could not find %s, return -ENOENT \n", path);
+                errno = ENOENT;
+                return -errno;
+        }
 
-	return retstat;
+	return -1;
 }
 
 /** Read directory
@@ -498,6 +504,7 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 {
 	int retstat = 0;
 
+	log_msg("\n [sfs_readdir] on %s, calling filler \n", path);
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
@@ -508,6 +515,7 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 	} else {
 		// end condition if true
 		if(directory->dirContents == NULL) {
+			log_msg("\n directory->dircontents == NULL, returning success \n");
 			return retstat;
 		} else {
 			fileControlBlock *curr = directory->dirContents[0];
@@ -518,6 +526,8 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 				i++;
 				curr = directory->dirContents[i];
 			}
+
+			log_msg("\n [sfs_readdir] ending on i=%d \n", i);
 		}
 	}
 

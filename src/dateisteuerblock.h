@@ -15,4 +15,3 @@ int getFreeDataBlockNum();
 int getFreeInodeNum(superblock *sBlock);
 int createAllInodes();
 int formatDisk(superblock *sBlock);
-int inode_read(int blockNum, fileControlBlock* buf, int offset);

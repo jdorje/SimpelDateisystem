@@ -29,11 +29,6 @@ extern superblock sBlockData;
 extern superblock* sBlock;
 extern int diskSize, diskfile;
 
-int inode_read(int blockNum, fileControlBlock* buf, int offset)
-{
-	return pread(diskfile, buf, BLOCK_SIZE, blockNum*BLOCK_SIZE);
-}
-
 /**
  * Input: /home/bob/file.txt, /hi.txt
  * Output: bob, /
@@ -118,7 +113,7 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 		//TODO ENSURE BMAPS ARE SET PROPERLY
 		if(sBlock->ibmap[i]!=USED)
 		{
-			log_msg("\n[create_inode] free inode space found in index %d\n", i);
+			log_msg("\n [create_inode] free inode space found in index %d\n", i);
 
 			char *pLastSlash = strrchr(path, '/');
 			const char *relativeName = pLastSlash ? pLastSlash : path;
@@ -177,7 +172,7 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 		i++;
 	}
 
-	log_msg("\n[create_inode] could not find a free inode, searched %d out of %d\n", i, sBlock->numDataBlocks);
+	log_msg("\n [create_inode] could not find a free inode, searched %d out of %d \n", i, sBlock->numDataBlocks);
 	return NULL;
 }
 
@@ -238,7 +233,7 @@ fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *
 				char* currInodeParentName = &currFCB->parentDir[0];
 				if (currInodeParentName != NULL) {
 					if (strcmp(currInodeParentName, RelativeParentName) == 0) {
-						log_msg("\n [findFileOrDir] relativeName (%s) and RelativeParentName (%s) for inode %d match \n", relativeName, RelativeParentName, x);
+						log_msg("\n [findFileOrDir] relativeName (%s) and RelativeParentName (%s) for inode %d match \n", currInodeParentName, RelativeParentName, x);
 					} else {
 						log_msg("\n [findFileOrDir] given relativeName (%s) and found relativeName (%s) do not match but returning finding anyway. \n", relativeName, RelativeParentName);
 					}
@@ -255,7 +250,6 @@ fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *
 		x++;
 	}
 
-	log_msg("\n [findFileOrDir] returnung NULL, calling function should give ENOENT\n");
 	return NULL;
 
 }
