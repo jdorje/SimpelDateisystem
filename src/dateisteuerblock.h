@@ -1,4 +1,5 @@
-fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir);
+fileControlBlock *findFileOrDir(const char *filePath, BOOL isDir);
+fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr, BOOL isDir);
 fileControlBlock *findRootOrDieTrying();
 fileControlBlock *getParentFcb(fileControlBlock *child);
 fileControlBlock *create_inode(fileType type, const char *filePath);
@@ -14,3 +15,4 @@ int getFreeDataBlockNum();
 int getFreeInodeNum(superblock *sBlock);
 int createAllInodes();
 int formatDisk(superblock *sBlock);
+int inode_read(int blockNum, fileControlBlock* buf, int offset);

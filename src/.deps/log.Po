@@ -11,9 +11,8 @@ log.o: log.c /usr/include/stdc-predef.h params.h \
  /usr/include/bits/types.h /usr/include/bits/typesizes.h \
  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
  /usr/lib/gcc/x86_64-redhat-linux/4.8.5/include/stdarg.h \
- /usr/include/bits/sys_errlist.h /usr/include/getopt.h \
- /usr/include/bits/stdio.h fuse.h /usr/include/fuse/fuse_common.h \
- /usr/include/fuse/fuse_opt.h \
+ /usr/include/bits/sys_errlist.h /usr/include/getopt.h fuse.h \
+ /usr/include/fuse/fuse_common.h /usr/include/fuse/fuse_opt.h \
  /usr/lib/gcc/x86_64-redhat-linux/4.8.5/include/stdint.h \
  /usr/include/stdint.h /usr/include/bits/wchar.h /usr/include/sys/types.h \
  /usr/include/time.h /usr/include/bits/pthreadtypes.h \
@@ -78,8 +77,6 @@ params.h:
 /usr/include/bits/sys_errlist.h:
 
 /usr/include/getopt.h:
-
-/usr/include/bits/stdio.h:
 
 fuse.h:
 

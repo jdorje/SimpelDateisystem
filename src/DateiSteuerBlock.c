@@ -27,7 +27,12 @@ extern fileControlBlock inodes[100];
 extern char *diskFile;
 extern superblock sBlockData;
 extern superblock* sBlock;
-extern int diskSize;
+extern int diskSize, diskfile;
+
+int inode_read(int blockNum, fileControlBlock* buf, int offset)
+{
+	return pread(diskfile, buf, BLOCK_SIZE, blockNum*BLOCK_SIZE);
+}
 
 /**
  * Input: /home/bob/file.txt, /hi.txt
@@ -125,7 +130,7 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 			if (parentName != NULL) {
 				memcpy(&inodes[i].parentDir, parentName, strlen(parentName));
 				//find parent
-				parent = findFileOrDir(parentName, findRootOrDieTrying(), TRUE);
+				parent = findFileOrDir(parentName, TRUE);
 				free(parentName);
 			} else {
 				log_msg("\n [create_inode] could not get relative parent name for %s\n", path);
@@ -198,11 +203,22 @@ void showInodeNames()
 	}
 }
 
+fileControlBlock* findFileOrDir(const char *filePath, BOOL isDir)
+{
+	fileControlBlock* root = findRootOrDieTrying();
+	if (root != NULL) {
+		return findFileOrDirInternal(filePath, root, isDir);
+	}
+
+	log_msg("\n[findFileOrDir] could not find parent directory root\n");
+	return NULL;
+}
+
 /*
  *  findFileOrDir ASSUMES YOU ARE GIVEN AN ABSOLUTE PATH NAME AND STRIPS IT DOWN TO RELATIVE NAME
  */
 
-fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir)
+fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr, BOOL isDir)
 {
 	if (strcmp(filePath, "/") == 0) {
 		return findRootOrDieTrying();

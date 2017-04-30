@@ -215,7 +215,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		return 0;
 	} else {
 		// find file: note, findFileOrDir already strips this path to relative name, you don't need to do it here
-		fileControlBlock *fileHandle = findFileOrDir(path, findRootOrDieTrying(), FALSE);
+		fileControlBlock *fileHandle = findFileOrDir(path, FALSE);
 		if(fileHandle == NULL){
 			log_msg("\n [sfs_getattr] findFileOrDir could not find %s so returning ENOENT\n", path);
 			errno = ENOENT;
@@ -262,19 +262,16 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 
 	// find inode with the specific path
 	// if it does not exist, create an inode for it
-	fileControlBlock *root = findRootOrDieTrying();
-	if (root != NULL) {
-		fileControlBlock *inode = findFileOrDir(path, root, FALSE);
-		if(inode == NULL)
-		{
-			log_msg("\n[sfs_create]  %s not found, passing to create_inode\n", path);
-			create_inode(IS_FILE ,path);			
-		} 
-		// open the inode
-		else {
-			log_msg("\n[sfs_create] %s found, should I call open? Doing nothing but returning success \n", path);
-			//TODO: how to open a file??
-		}
+	fileControlBlock *inode = findFileOrDir(path, FALSE);
+	if(inode == NULL)
+	{
+		log_msg("\n[sfs_create]  %s not found, passing to create_inode\n", path);
+		create_inode(IS_FILE ,path);			
+	} 
+	// open the inode
+	else {
+		log_msg("\n[sfs_create] %s found, should I call open? Doing nothing but returning success \n", path);
+		//TODO: how to open a file??
 	}
 
 	return retstat;
@@ -286,40 +283,35 @@ int sfs_unlink(const char *path)
 	int retstat = -1;
 	log_msg("sfs_unlink(path=\"%s\")\n", path);
 
-	fileControlBlock *root = findRootOrDieTrying();
-	if(root != NULL) {
-		fileControlBlock *fcbToUnlink = findFileOrDir(path, root, FALSE);
-		if (fcbToUnlink != NULL) {
-			//unlink from the linked list structure
-			char* parentDname = &(fcbToUnlink->parentDir[0]);
-			if (parentDname != NULL) {
-				fileControlBlock *parentDir = findFileOrDir(parentDname, root, TRUE);
-				if ((parentDir != NULL) && (parentDir->dirContents[0] != NULL)) {
-					// New code, just use array properties
-					int i = 0;
-					// find where parent points to the unlinked node
-					while (parentDir->dirContents[i] != fcbToUnlink) {
-						parentDir->dirContents[i] = NULL;
-						i++;
-					}
-					log_msg("\n[sfs_unlink] unlinked %s from parentDir at dirContents[%d]\n", path, i);
-					retstat = 0;
-					//TODO: free block data.
-					//TODO: update the inode bitmap entry
-				} else {
-					log_msg("[sfs_unlink] cannot get a handle on the parent directory\n OR parentDir is null so I can't get head");
-					errno = EIO;
+	fileControlBlock *fcbToUnlink = findFileOrDir(path, FALSE);
+	if (fcbToUnlink != NULL) {
+		//unlink from the linked list structure
+		char* parentDname = &(fcbToUnlink->parentDir[0]);
+		if (parentDname != NULL) {
+			fileControlBlock *parentDir = findFileOrDir(parentDname, TRUE);
+			if ((parentDir != NULL) && (parentDir->dirContents[0] != NULL)) {
+				// New code, just use array properties
+				int i = 0;
+				// find where parent points to the unlinked node
+				while (parentDir->dirContents[i] != fcbToUnlink) {
+					parentDir->dirContents[i] = NULL;
+					i++;
 				}
+				log_msg("\n[sfs_unlink] unlinked %s from parentDir at dirContents[%d]\n", path, i);
+				retstat = 0;
+				//TODO: free block data.
+				//TODO: update the inode bitmap entry
 			} else {
-				log_msg("[sfs_unlink] no name for parent directory?");
+				log_msg("[sfs_unlink] cannot get a handle on the parent directory\n OR parentDir is null so I can't get head");
 				errno = EIO;
 			}
 		} else {
-			log_msg("[sfs_unlink] unable to find file you want to remove");
-			errno = ENOENT;
+			log_msg("[sfs_unlink] no name for parent directory?");
+			errno = EIO;
 		}
 	} else {
-		errno = EIO;
+		log_msg("[sfs_unlink] unable to find file you want to remove");
+		errno = ENOENT;
 	}
 
 	return retstat;
@@ -337,12 +329,17 @@ int sfs_unlink(const char *path)
  */
 int sfs_open(const char *path, struct fuse_file_info *fi)
 {
-	int retstat = 0;
-	log_msg("\nsfs_open(path\"%s\", fi=0x%08x)\n",
-			path, fi);
+	fileControlBlock *fcb = findFileOrDir(path, FALSE);
+	if (fcb != NULL) {
+		log_msg("\n [sfs_open] found %s, return success \n", path);
+		return 0;
+	} else {
+		log_msg("\n [sfs_open] could not find %s, return -ENOENT \n ", path);
+		errno = ENOENT;
+		return -errno;
+	}
 
-
-	return retstat;
+	return -1;
 }
 
 /** Release an open file
@@ -361,12 +358,17 @@ int sfs_open(const char *path, struct fuse_file_info *fi)
  */
 int sfs_release(const char *path, struct fuse_file_info *fi)
 {
-	int retstat = 0;
-	log_msg("\nsfs_release(path=\"%s\", fi=0x%08x)\n",
-			path, fi);
-
-
-	return retstat;
+	fileControlBlock *fcb = findFileOrDir(path, FALSE);
+	if (fcb != NULL) {
+		log_msg("\n [sfs_release] found %s, return success \n", path);
+		return 0;
+	} else {
+		log_msg("\n [sfs_release] could not find %s, return -ENOENT \n", path);
+		errno = ENOENT;
+		return -errno;
+	}
+	
+	return -1;
 }
 
 /** Read data from an open file
@@ -406,26 +408,21 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	log_msg("\nsfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 			path, buf, size, offset, fi);
 
-	fileControlBlock *root = findRootOrDieTrying();
-	if (root != NULL) {
-		fileControlBlock *fc = findFileOrDir(path, root, FALSE);
-		if (fc != NULL) {
-			int size_of_data_block = 4096;
-			int how_many_pointers = sizeof(fc->block)/sizeof(fc->block[0]); //15
-			int capacity = how_many_pointers * size_of_data_block;
-			if (size <= capacity) {
-				log_msg("\n [sfs_write] size %d less than capacity %d, returning success\n", size, capacity);
-				int i = 0;
-			} else {
-				log_msg("\n [sfs_write] you're asking to write more than this file sytem can support \n");
-				errno = EFBIG;
-			}
+	fileControlBlock *fc = findFileOrDir(path, FALSE);
+	if (fc != NULL) {
+		int size_of_data_block = 4096;
+		int how_many_pointers = sizeof(fc->block)/sizeof(fc->block[0]); //15
+		int capacity = how_many_pointers * size_of_data_block;
+		if (size <= capacity) {
+			log_msg("\n [sfs_write] size %d less than capacity %d, returning success\n", size, capacity);
+			int i = 0;
 		} else {
-			log_msg("\n [sfs_write] cannot find the file \n");
-			errno = ENOENT;
+			log_msg("\n [sfs_write] you're asking to write more than this file sytem can support \n");
+			errno = EFBIG;
 		}
 	} else {
-		log_msg("\n [sfs_write] cannot find root dir, uhhhh? \n");
+		log_msg("\n [sfs_write] cannot find the file \n");
+		errno = ENOENT;
 	}
 
 	return bytes_written;
@@ -504,8 +501,7 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	fileControlBlock *root = findRootOrDieTrying();
-	fileControlBlock *directory = findFileOrDir(path, root, TRUE);
+	fileControlBlock *directory = findFileOrDir(path, TRUE);
 	if(directory == NULL){
 		log_msg("\n [sfs_readdir] Could not find directory using path: %s \n", path);
 		return -1;
