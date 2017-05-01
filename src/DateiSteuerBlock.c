@@ -123,7 +123,7 @@ BOOL add_to_direntry(fileControlBlock* parent, fileControlBlock *child)
 			int i;
 			for(i = 0; i < MAX_FILES_IN_DIR; i++) {
 				if (parent->dirContents[i] == NULL) {
-					parent->dirContents[i] = &inodes[i];
+					parent->dirContents[i] = child;
 					break;
 				}		
 			}
@@ -138,7 +138,7 @@ BOOL add_to_direntry(fileControlBlock* parent, fileControlBlock *child)
 		}
 	}
 
-	return FALSE;
+	return TRUE;
 }
 
 BOOL indexed_remove_from_direntry(fileControlBlock* parent, int dirContentIndex)
@@ -230,7 +230,7 @@ fileControlBlock *create_inode(const char * path, mode_t mode)
 			}
 
 			char *pLastSlash = strrchr(path, '/');
-                	const char *relativeName = pLastSlash ? pLastSlash : path;
+                	const char *relativeName = pLastSlash ? pLastSlash+1 : path;
 			
 			strcpy(inodes[i].fileName, relativeName);
 			strcpy(inodes[i].parentDir, parent->fileName);

@@ -497,13 +497,15 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 			log_msg("\n directory->dircontents == NULL, returning success \n");
 			return retstat;
 		} else {
-			fileControlBlock *curr = directory->dirContents[0];
-			int i = 1;
-			while(curr != NULL){
+
+			int i = 0;
+			fileControlBlock *curr;
+			for(curr = directory->dirContents[i];
+				curr != NULL; 
+				curr = directory->dirContents[++i])
+			{
 				log_msg("\n [sfs_readdir] calling filler on %s, i=%d \n", curr->fileName, i);
 				filler(buf, curr->fileName, NULL, 0);
-				i++;
-				curr = directory->dirContents[i];
 			}
 
 			log_msg("\n [sfs_readdir] ending on i=%d \n", i);
