@@ -4,25 +4,14 @@
 #define MAX_FILES_IN_DIR 30
 
 typedef enum {
-	
-
-	IS_FILE,
-	IS_DIR
-
-} fileType;
-
-typedef enum {
-	
 	NOT_USED,
 	USED
 
 } status;
 
 typedef enum {
-	
-	TRUE,
-	FALSE
-
+	FALSE,
+	TRUE
 } BOOL;
 
 
@@ -35,6 +24,7 @@ typedef struct {
 	int numInodes; //total number of inodes
 	int numDataBlocks; // total number of data blocks
 	int inodeStartIndex; //the index of the start of the first inode
+	int datablockStartIndex; //the index of the start of the first data block
 	
 	status ibmap[MAX_BLOCKS];
 	status dbmap[MAX_BLOCKS];
@@ -46,18 +36,17 @@ struct fileControlBlock {
 
 	char fileName[NAME_SIZE];
 	long fileSize; // number of files in directory or size of actual file
-	char parentDir[NAME_SIZE]; //name of parent directory
-	fileType fileType;
+	short numBlocks; //number of blocks used for data
+	short inumber; //its own index number in the array of inodes
+	short parent_inumber; //its parent's inumber
+	char parentDir[NAME_SIZE]; //path of parent directory
 	short mode; //can this file be read/written/executed?
 	short uid; //who owns this file?
 	char block[60]; //a set of disk pointers (15 total)
 	long time; //what time was this file last accessed?
 
-	//array of files/directories in the current directory
-	// null if no files
-	//TODO: CHANGE DIRCONTENTS TO FIXED ARRAY
+
 	fileControlBlock *dirContents[MAX_FILES_IN_DIR];
-	
 } ;
 
 

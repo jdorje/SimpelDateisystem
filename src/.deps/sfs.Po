@@ -30,7 +30,7 @@ sfs.o: sfs.c /usr/include/stdc-predef.h params.h \
  /usr/include/bits/stdlib-float.h /usr/include/string.h \
  /usr/include/unistd.h /usr/include/bits/posix_opt.h \
  /usr/include/bits/environments.h /usr/include/bits/confname.h knoten.h \
- log.h
+ dateisteuerblock.h log.h
 
 /usr/include/stdc-predef.h:
 
@@ -169,5 +169,7 @@ fuse.h:
 /usr/include/bits/confname.h:
 
 knoten.h:
+
+dateisteuerblock.h:
 
 log.h:

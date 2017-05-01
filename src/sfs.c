@@ -121,13 +121,13 @@ void *sfs_init(struct fuse_conn_info *conn)
 				fileControlBlock *fcb = &inodes[i];
 
 				//check if dir 
-				if(fcb->fileType == IS_DIR){
+				if(S_ISDIR(fcb->mode)){
 
 					//log_msg("\n dir found.\n");
 					//block_write_padded(i, &fcb, sizeof(fileControlBlock));			
 				} 
 				//check if we have file
-				else if(fcb->fileType == IS_FILE){
+				else if(S_ISREG(fcb->mode)){
 
 					// set the data bmap
 					if(fcb->fileSize < 1)
@@ -319,10 +319,8 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		retstat = 0;
 	} else {
 
-		char *pLastSlash = strrchr(path, '/');
-		char *relativeName = pLastSlash ? pLastSlash + 1 : path;
-		// find file 
-		fileControlBlock *fileHandle = findFileOrDir(path, findRootOrDieTrying(), FALSE);
+		// find file: note, findFileOrDir already strips this path to relative name, you don't need to do it here
+		fileControlBlock *fileHandle = findFileOrDir(path);
 		if(fileHandle == NULL){
 
 			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%---------08x);",
@@ -421,81 +419,28 @@ fileControlBlock *findRootOrDieTrying()
  */
 int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-	int retstat = 0;
-	log_msg("\nsfs_create(path=\"%s\", mode=0%03o, fi=0x%08x)\n",
-			path, mode, fi);
 
-	// find inode with the specific path
-	// if it does not exist, create an inode for it
-	fileControlBlock *root = findRootOrDieTrying();
-	if (root != NULL) {
+	log_msg("\n [sfs_create] passing %s to create_inode \n", path);
 
-		fileControlBlock *inode = findFileOrDir(path, root, FALSE);
-
-		if(inode == NULL)
-		{
-
-			create_inode(IS_FILE ,path);			
-
-		} 
-		// open the inode
-		else {
-			//TODO: how to open a file??
-
-
-		}
+	if (create_inode(path, mode) == NULL) {
+		return -errno;
 	}
 
-	return retstat;
+	return 0;
 }
 
 /** Remove a file */
 int sfs_unlink(const char *path)
 {
-	int retstat = -1;
-	log_msg("sfs_unlink(path=\"%s\")\n", path);
 
-	fileControlBlock *root = findRootOrDieTrying();
-	if(root != NULL) {
-		fileControlBlock *fcbToUnlink = findFileOrDir(path, root, FALSE);
-		if (fcbToUnlink != NULL) {
-			//unlink from the linked list structure
-			char* parentDname = &(fcbToUnlink->parentDir[0]);
-			if (parentDname != NULL) {
-				fileControlBlock *parentDir = findFileOrDir(path, root, TRUE);
+        log_msg("\n[sfs_unlink] passing %s to remove_inode\n", path);
 
-				if ((parentDir != NULL) && (parentDir->dirContents[0] != NULL)) {
+        if (remove_inode(path) == FALSE) {
+                errno = ENOENT;
+                return -errno;
+        }
 
-					int i = 0;
-					// find where parent points to the unlinked node
-					while (parentDir->dirContents[i] != fcbToUnlink) {
-
-						parentDir->dirContents[i] = NULL;
-						i++;
-					}
-
-
-					//TODO: free block data.
-					//TODO: update the inode bitmap entry
-
-
-				} else {
-					log_msg("cannot get a handle on the parent directory\n OR parentDir is null so I can't get head");
-					errno = EIO;
-				}
-			} else {
-				log_msg("no name for parent directory?");
-				errno = EIO;
-			}
-		} else {
-			log_msg("unable to find file you want to remove");
-			errno = ENOENT;
-		}
-	} else {
-		errno = EIO;
-	}
-
-	return retstat;
+        return 0;
 }
 
 /** File open operation
@@ -510,12 +455,17 @@ int sfs_unlink(const char *path)
  */
 int sfs_open(const char *path, struct fuse_file_info *fi)
 {
-	int retstat = 0;
-	log_msg("\nsfs_open(path\"%s\", fi=0x%08x)\n",
-			path, fi);
+	fileControlBlock *fcb = findFileOrDir(path);
+	if (fcb != NULL) {
+		log_msg("\n [sfs_open] found %s, return success \n", path);
+		return 0;
+	} else {
+		log_msg("\n [sfs_open] could not find %s, return -ENOENT \n ", path);
+		errno = ENOENT;
+		return -errno;
+	}
 
-
-	return retstat;
+	return -1;
 }
 
 /** Release an open file
@@ -534,12 +484,17 @@ int sfs_open(const char *path, struct fuse_file_info *fi)
  */
 int sfs_release(const char *path, struct fuse_file_info *fi)
 {
-	int retstat = 0;
-	log_msg("\nsfs_release(path=\"%s\", fi=0x%08x)\n",
-			path, fi);
-
-
-	return retstat;
+	fileControlBlock *fcb = findFileOrDir(path);
+	if (fcb != NULL) {
+		log_msg("\n [sfs_release] found %s, return success \n", path);
+		return 0;
+	} else {
+		log_msg("\n [sfs_release] could not find %s, return -ENOENT \n", path);
+		errno = ENOENT;
+		return -errno;
+	}
+	
+	return -1;
 }
 
 /** Read data from an open file
@@ -559,6 +514,16 @@ int sfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse
 	log_msg("\nsfs_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 			path, buf, size, offset, fi);
 
+        fileControlBlock *fc = findFileOrDir(path);
+        if (fc != NULL) {
+
+		log_msg("\n [sfs_read] to be implemented \n");
+
+        } else {
+                log_msg("\n [sfs_read] cannot find the file \n");
+                errno = ENOENT;
+		return -errno;
+        }
 
 	return retstat;
 }
@@ -579,17 +544,28 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	log_msg("\nsfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 			path, buf, size, offset, fi);
 
-	fileControlBlock *root = findRootOrDieTrying();
-	if (root != NULL) {
-		fileControlBlock *fc = findFileOrDir(path, root, FALSE);
-		if (fc != NULL) {
+	fileControlBlock *fc = findFileOrDir(path);
+	if (fc != NULL) {
+		int size_of_data_block = 4096;
+		int how_many_pointers = sizeof(fc->block)/sizeof(fc->block[0]); //15
+		int capacity = how_many_pointers * size_of_data_block;
+		if (size <= capacity) {
+			log_msg("\n [sfs_write] size %d less than capacity %d, returning success\n", size, capacity);
+
+			//If this requires writing more than fc->numBlocks, allocate new blocks
+
 			int i = 0;
+			for(; i < fc->numBlocks; i++) {
+				
+			}
+
 		} else {
-			log_msg("\n cannot find the file \n");
-			errno = ENOENT;
+			log_msg("\n [sfs_write] you're asking to write more than this file sytem can support \n");
+			errno = EFBIG;
 		}
 	} else {
-		log_msg("\n cannot find root dir, uhhhh? \n");
+		log_msg("\n [sfs_write] cannot find the file \n");
+		errno = ENOENT;
 	}
 
 	return bytes_written;
@@ -666,6 +642,12 @@ int getFreeInodeNum(superblock *sBlock){
 	}
 
 	//no more free inodes
+	log_msg("\n [sfs_mkdir] passing %s directly to create_inode \n", path);
+
+	if (create_inode(path, S_IFDIR | 0755) != NULL) {
+		return 0;
+	}
+
 	return -1;
 }
 
@@ -783,7 +765,7 @@ int sfs_rmdir(const char *path)
 	log_msg("sfs_rmdir(path=\"%s\")\n",
 			path);
 
-	if(remove_inode(IS_DIR, path) == FALSE){
+	if (remove_inode(path) == FALSE) {
 		errno = ENOENT;
 		retstat = errno;
 
@@ -802,12 +784,18 @@ int sfs_rmdir(const char *path)
  */
 int sfs_opendir(const char *path, struct fuse_file_info *fi)
 {
-	int retstat = 0;
-	log_msg("\nsfs_opendir(path=\"%s\", fi=0x%08x)\n",
-			path, fi);
 
+        fileControlBlock *fcb = findFileOrDir(path);
+        if (fcb != NULL) {
+                log_msg("\n [sfs_opendir] found %s, return success \n", path);
+                return 0;
+        } else {
+                log_msg("\n [sfs_opendir] could not find %s, return -ENOENT \n", path);
+                errno = ENOENT;
+                return -errno;
+        }
 
-	return retstat;
+	return -1;
 }
 
 /** Read directory
@@ -836,28 +824,31 @@ int sfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offse
 {
 	int retstat = 0;
 
+	log_msg("\n [sfs_readdir] on %s, calling filler \n", path);
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	fileControlBlock *root = &inodes[0];
-
-	fileControlBlock *directory = findFileOrDir(path, root, TRUE);
+	fileControlBlock *directory = findFileOrDir(path);
 	if(directory == NULL){
 		log_msg("\n Could not find directory using path: %s \n", path);
 		return -1;
-	}
+	} else {
+		// end condition if true
+		if(directory->dirContents == NULL) {
+			log_msg("\n directory->dircontents == NULL, returning success \n");
+			return retstat;
+		} else {
+			fileControlBlock *curr = directory->dirContents[0];
+			int i = 1;
+			while(curr != NULL){
+				log_msg("\n [sfs_readdir] calling filler on %s, i=%d \n", curr->fileName, i);
+				filler(buf, curr->fileName, NULL, 0);
+				i++;
+				curr = directory->dirContents[i];
+			}
 
-	// end condition if true
-	if(directory->dirContents == NULL)
-		return retstat;
-
-	fileControlBlock *curr = directory->dirContents[0];
-	int i = 1;
-	while(curr != NULL){
-		log_msg("\n inLoop: filler on \n", curr->fileName);
-		filler(buf, curr->fileName, NULL, 0);
-		i++;
-		curr = directory->dirContents[i];
+			log_msg("\n [sfs_readdir] ending on i=%d \n", i);
+		}
 	}
 
 	return retstat;
