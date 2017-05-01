@@ -38,7 +38,7 @@ char *getRelativeParentName(const char *filePath)
 	if (filePath != NULL) {
 		char *fromLastSlash = strrchr(filePath, '/');
 		if (fromLastSlash != NULL) {
-			char *absoluteParentName = malloc(sizeof(char) * strlen(filePath));
+			char *absoluteParentName = calloc(sizeof(char) * strlen(filePath), sizeof(char));
 			if (absoluteParentName != NULL) {
 
 				int lenAbsParent = strlen(filePath) - strlen(fromLastSlash);
@@ -56,9 +56,9 @@ char *getRelativeParentName(const char *filePath)
 					strncpy(absoluteParentName, filePath, lenAbsParent);
 					char *fromLastSlashInAP = strrchr(absoluteParentName, '/');
 					if (fromLastSlashInAP != NULL) {
-						char* relativeParentName = malloc(sizeof(char) * strlen(fromLastSlashInAP));
+						char* relativeParentName = calloc(sizeof(char)*strlen(fromLastSlashInAP)+1, sizeof(char));
 						if (relativeParentName != NULL) {
-							char* RelativeParentName = strcpy(relativeParentName, fromLastSlashInAP);
+							char* RelativeParentName = strcpy(relativeParentName, fromLastSlashInAP+1);
 							log_msg(" \n [getRelativeParentName] called on %s, returned %s \n", filePath, RelativeParentName);
 							return RelativeParentName;
 						} else {
@@ -79,7 +79,7 @@ char *getRelativeParentName(const char *filePath)
 				log_msg("\n [getRelativeParentName] could not malloc for absoluteParentName \n");
 			}
 		} else {
-			log_msg("\n [getRelativeParentName] Wrong file name, path always needs slash\n");
+			log_msg("\n [getRelativeParentName] Wrong file name (%s), path always needs slash\n", filePath);
 		} 
 	} else {
 		log_msg("\n [getRelativeParentName] filePath give nto getRelativeParentName is NULL\n");
@@ -132,7 +132,7 @@ BOOL add_to_direntry(fileControlBlock* parent, fileControlBlock *child)
 				log_msg("\n [add_to_direntry] more than the maximum files allowed in this entry! \n");
 				return FALSE;
 			} else {
-				log_msg("\n [add_to_direntry] replaced parent directory entry %d with new inode \n", i);
+				log_msg("\n [add_to_direntry] replaced parent (%s)'s directory entry %d with new inode \n", parent->fileName, i);
 				return TRUE;
 			}
 		}
@@ -218,22 +218,42 @@ fileControlBlock *create_inode(const char * path, mode_t mode)
 		{
 			log_msg("\n [create_inode] free inode space found in index %d\n", i);
 
-			fileControlBlock *parent = getParentFcb(&inodes[i]);
-			if(parent == NULL){
-				log_msg("\n [create_inode] Could not find the parent file control block \n");
-				return NULL;		
-			} else {
-				if (!add_to_direntry(parent, &inodes[i])) {
-					log_msg("\n [create_inode] Could not add new inode to parent directory entry \n");
-					return NULL;
-				}
-			}
-
 			char *pLastSlash = strrchr(path, '/');
 			const char *relativeName = pLastSlash ? pLastSlash+1 : path;
+			fileControlBlock *parent = NULL;
 
+			const char* parentDir = getRelativeParentName(path);
+			if (parentDir != NULL) {
+				if (strcmp(parentDir, "/") == 0) {
+					parent = findRootOrDieTrying();
+				} else {
+					char* absolutePathToParent = calloc(sizeof(char)*strlen(path), sizeof(char));
+					if (absolutePathToParent != NULL) {
+						strncpy(absolutePathToParent, path, strlen(path)-strlen(relativeName)-1);
+						parent = findFileOrDir(absolutePathToParent);
+					} else {
+						log_msg("\n [create_inode] calloc fail \n");
+					}
+				}
+
+				if(parent == NULL){
+					log_msg("\n [create_inode] Could not find the parent file control block \n");
+					return NULL;		
+				} else {
+					if (!add_to_direntry(parent, &inodes[i])) {
+						log_msg("\n [create_inode] Could not add new inode to parent directory entry \n");
+						return NULL;
+					}
+				}
+			} else {
+				log_msg(" \n [create_inode] could not find parent name \n");
+				return NULL;
+			}
+
+			log_msg("\n [create_inode] creating inode of name %s, parent dir %s \n", relativeName, parentDir);
 			strcpy(inodes[i].fileName, relativeName);
-			strcpy(inodes[i].parentDir, parent->fileName);
+			strcpy(inodes[i].parentDir, parentDir);
+			inodes[i].parent_inumber = parent->inumber;
 			inodes[i].mode = mode;
 			inodes[i].uid = getuid();
 			inodes[i].time = time(NULL);
@@ -242,7 +262,9 @@ fileControlBlock *create_inode(const char * path, mode_t mode)
 			sBlock->ibmap[i]=USED;
 
 			return &inodes[i];
+
 		}
+
 		i++;
 	}
 
@@ -311,7 +333,9 @@ fileControlBlock *findFileOrDir(const char *filePath)
 						if (strcmp(currInodeParentName, RelativeParentName) == 0) {
 							log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) for inode %d match \n", RelativeParentName, currInodeParentName, x);
 						} else {
-							log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) do not match but returning finding anyway. \n", RelativeParentName, currInodeParentName);
+							log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) do not match. \n", RelativeParentName, currInodeParentName);
+							free(RelativeParentName);
+							continue;
 						}
 					}
 
@@ -438,24 +462,24 @@ BOOL flushAllInodesTodisk(BOOL firstTime)
 		}
 		return TRUE;
 	} else {
-		int currBlockFillNum = 0, currBlock = 0;
-		int i = 0;
-		int endCond = sBlock->numInodes;
+		/*
+		   int currBlockFillNum = 0, currBlock = 0;
+		   int i = 0;
+		   int endCond = sBlock->numInodes;
 
-		for(; i < (endCond-1); i++)
-		{
-			fileControlBlock curr = inodes[i];
-			block_write_padded(currBlock, &inodes[i], sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
+		   for(; i < (endCond-1); i++)
+		   {
+		   fileControlBlock curr = inodes[i];
+		   block_write_padded(currBlock, &inodes[i], sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
 
-			currBlockFillNum++;
-			if (currBlockFillNum >= 6) {
-				currBlockFillNum = 0;
-				currBlock++;
-			}
-		}
-		
-		log_msg("\n [flushAllInodesTodisk] updated the inode data on disk \n");
-		return TRUE;
+		   currBlockFillNum++;
+		   if (currBlockFillNum >= 6) {
+		   currBlockFillNum = 0;
+		   currBlock++;
+		   }
+		   }
+		   */
+		log_msg("\n [flushAllInodesTodisk] was bugging out so I'm not doing anything for now \n");
 	}
 
 	return FALSE;
