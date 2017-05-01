@@ -260,7 +260,7 @@ int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
 	log_msg("\n [sfs_create] passing %s to create_inode \n", path);
 
-	if (create_inode(IS_FILE, path) == NULL) {
+	if (create_inode(IS_FILE, path, mode) == NULL) {
 		return -errno;
 	}
 
@@ -413,7 +413,7 @@ int sfs_mkdir(const char *path, mode_t mode)
 {
 	log_msg("\n [sfs_mkdir] passing %s directly to create_inode \n", path);
 
-	if (create_inode(IS_DIR, path) != NULL) {
+	if (create_inode(IS_DIR, path, S_IFDIR | 0755) != NULL) {
 		return 0;
 	}
 

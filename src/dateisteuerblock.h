@@ -2,7 +2,7 @@ fileControlBlock *findFileOrDir(const char *filePath, BOOL isDir);
 fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr, BOOL isDir);
 fileControlBlock *findRootOrDieTrying();
 fileControlBlock *getParentFcb(fileControlBlock *child);
-fileControlBlock *create_inode(fileType type, const char *filePath);
+fileControlBlock *create_inode(fileType type, const char *filePath, mode_t mode);
 
 BOOL remove_inode(fileType type, const char *filePath);
 BOOL add_to_direntry(fileControlBlock *parent, fileControlBlock *child);

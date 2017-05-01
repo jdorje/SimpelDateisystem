@@ -208,7 +208,7 @@ BOOL remove_from_direntry(fileControlBlock* parent, fileControlBlock *child)
 }
 
 // create_inode assumes it is given an absolute path, which it converts to relative
-fileControlBlock *create_inode(fileType ftype, const char * path)
+fileControlBlock *create_inode(fileType ftype, const char * path, mode_t mode)
 {
 	int i =1;
 	fileControlBlock *parent = NULL;
@@ -247,18 +247,7 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 			}
 
 			inodes[i].fileType = ftype;
-			switch(ftype)
-			{
-				case IS_DIR:
-					inodes[i].mode = S_IFDIR | 0755;
-					break;
-				case IS_FILE:
-					inodes[i].mode = S_IFREG | 0666;
-					break;
-				default:
-					log_msg("\n [create_inode] file type %d is not recognizable as file or dir \n", ftype);
-					inodes[i].mode = S_IFREG | 0666;
-			}
+			inodes[i].mode = mode;
 			inodes[i].uid = getuid();
 			inodes[i].time = time(NULL);
 			inodes[i].inumber = i;
