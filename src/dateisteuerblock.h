@@ -1,10 +1,10 @@
-fileControlBlock *findFileOrDir(const char *filePath, BOOL isDir);
-fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr, BOOL isDir);
+fileControlBlock *findFileOrDir(const char *filePath);
+fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr);
 fileControlBlock *findRootOrDieTrying();
 fileControlBlock *getParentFcb(fileControlBlock *child);
-fileControlBlock *create_inode(fileType type, const char *filePath);
+fileControlBlock *create_inode(const char *filePath, mode_t mode);
 
-BOOL remove_inode(fileType type, const char *filePath);
+BOOL remove_inode(const char *filePath);
 BOOL add_to_direntry(fileControlBlock *parent, fileControlBlock *child);
 BOOL indexed_remove_from_direntry(fileControlBlock* parent, int dirContentIndex);
 BOOL remove_from_direntry(fileControlBlock *parent, fileControlBlock *child);

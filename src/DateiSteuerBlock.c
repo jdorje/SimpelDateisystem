@@ -208,10 +208,9 @@ BOOL remove_from_direntry(fileControlBlock* parent, fileControlBlock *child)
 }
 
 // create_inode assumes it is given an absolute path, which it converts to relative
-fileControlBlock *create_inode(fileType ftype, const char * path)
+fileControlBlock *create_inode(const char * path, mode_t mode)
 {
 	int i =1;
-	fileControlBlock *parent = NULL;
 	while(i < sBlock->numInodes)
 	{
 		//TODO ENSURE BMAPS ARE SET PROPERLY
@@ -219,23 +218,7 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 		{
 			log_msg("\n [create_inode] free inode space found in index %d\n", i);
 
-			char *pLastSlash = strrchr(path, '/');
-			const char *relativeName = pLastSlash ? pLastSlash : path;
-
-			memcpy(&inodes[i].fileName, relativeName, strlen(relativeName));
-			inodes[i].fileSize = 0; //no data yet, still unknown
-
-			char *parentName = getRelativeParentName(path);
-			if (parentName != NULL) {
-				memcpy(&inodes[i].parentDir, parentName, strlen(parentName));
-				//find parent
-				parent = findFileOrDir(parentName, TRUE);
-				free(parentName);
-			} else {
-				log_msg("\n [create_inode] could not get relative parent name for %s\n", path);
-			}	
-
-
+			fileControlBlock *parent = getParentFcb(&inodes[i]);
 			if(parent == NULL){
 				log_msg("\n [create_inode] Could not find the parent file control block \n");
 				return NULL;		
@@ -246,24 +229,18 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 				}
 			}
 
-			inodes[i].fileType = ftype;
-			switch(ftype)
-			{
-				case IS_DIR:
-					inodes[i].mode = S_IFDIR | 0755;
-					break;
-				case IS_FILE:
-					inodes[i].mode = S_IFREG | 0666;
-					break;
-				default:
-					log_msg("\n [create_inode] file type %d is not recognizable as file or dir \n", ftype);
-					inodes[i].mode = S_IFREG | 0666;
-			}
+			char *pLastSlash = strrchr(path, '/');
+                	const char *relativeName = pLastSlash ? pLastSlash : path;
+			
+			strcpy(inodes[i].fileName, relativeName);
+			strcpy(inodes[i].parentDir, parent->fileName);
+			inodes[i].mode = mode;
 			inodes[i].uid = getuid();
 			inodes[i].time = time(NULL);
 			inodes[i].inumber = i;
 			inodes[i].parent_inumber = parent->inumber;
 			sBlock->ibmap[i]=USED;
+
 			return &inodes[i];
 		}
 		i++;
@@ -274,11 +251,11 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 }
 
 
-BOOL remove_inode(fileType type, const char *filePath)
+BOOL remove_inode(const char *filePath)
 {
 	log_msg("\n [remove_inode] on %s, currently doing nothing \n", filePath);
 
-	fileControlBlock *f = findFileOrDir(filePath, type);
+	fileControlBlock *f = findFileOrDir(filePath);
 	if (f != NULL) {
 		fileControlBlock *p = getParentFcb(f);
 		if (p != NULL) {
@@ -313,11 +290,11 @@ void showInodeNames()
 	}
 }
 
-fileControlBlock* findFileOrDir(const char *filePath, BOOL isDir)
+fileControlBlock* findFileOrDir(const char *filePath)
 {
 	fileControlBlock* root = findRootOrDieTrying();
 	if (root != NULL) {
-		return findFileOrDirInternal(filePath, root, isDir);
+		return findFileOrDirInternal(filePath, root);
 	}
 
 	log_msg("\n[findFileOrDir] could not find parent directory root\n");
@@ -328,7 +305,7 @@ fileControlBlock* findFileOrDir(const char *filePath, BOOL isDir)
  *  findFileOrDir ASSUMES YOU ARE GIVEN AN ABSOLUTE PATH NAME AND STRIPS IT DOWN TO RELATIVE NAME
  */
 
-fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr, BOOL isDir)
+fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr)
 {
 	if (strcmp(filePath, "/") == 0) {
 		return findRootOrDieTrying();
@@ -427,7 +404,6 @@ int formatDisk(superblock *sBlock)
 	inodes[0].fileName[1] = '\0';
 	inodes[0].fileSize = 0;
 	inodes[0].parentDir[0] = '\0';
-	inodes[0].fileType = IS_DIR;
 	inodes[0].mode = S_IFDIR | 0755;
 
 	inodes[0].uid = getuid();
@@ -456,8 +432,7 @@ int formatDisk(superblock *sBlock)
 		curr.parentDir[0] = '\0';
 		curr.inumber = i;
 		curr.parent_inumber = -1;
-		curr.fileType = IS_DIR;
-		curr.mode = S_IFDIR;
+		curr.mode = S_IFDIR | 0755;
 
 		curr.uid = getuid();
 		curr.time = time(NULL);

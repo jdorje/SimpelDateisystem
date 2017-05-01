@@ -5,11 +5,6 @@
 #define MAX_FILES_IN_DIR 30
 
 typedef enum {
-	IS_FILE,
-	IS_DIR
-} fileType;
-
-typedef enum {
 	NOT_USED,
 	USED
 } status;
@@ -41,7 +36,6 @@ struct fileControlBlock {
 	short inumber; //its own index number in the array of inodes
 	short parent_inumber; //its parent's inumber
 	char parentDir[NAME_SIZE]; //path of parent directory
-	fileType fileType;
 	short mode; //can this file be read/written/executed?
 	short uid; //who owns this file?
 	char block[60]; //a set of disk pointers (15 total)
