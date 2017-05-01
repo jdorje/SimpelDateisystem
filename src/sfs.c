@@ -238,7 +238,7 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		statbuf->st_atime = fileHandle->time;
 		statbuf->st_mtime = fileHandle->time;
 		statbuf->st_ctime = fileHandle->time;
-		statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
+		statbuf->st_blksize = BLOCK_SIZE; 
 		statbuf->st_blocks = 0;
 
 	}

@@ -390,7 +390,7 @@ int formatDisk(superblock *sBlock)
 	log_msg("\n [formatDisk] remainingSpace == diskSize == %d \n", diskSize);
 
 	//account for sblock space
-	remainingSpace -= BLOCK_SIZE;
+	remainingSpace -= sizeof(superblock);
 	int spaceUsed = 0;
 	int currAllocation = 0;
 	sBlock->numInodesPerBlock = (BLOCK_SIZE / sizeof(fileControlBlock));
