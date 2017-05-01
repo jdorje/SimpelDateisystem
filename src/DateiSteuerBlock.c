@@ -405,35 +405,60 @@ int formatDisk(superblock *sBlock)
 	int currBlockFillNum = 1;
 	int currBlock = 1;
 
-	//TODO: FORMAT ALL INODES HERE!! THE ENTIRE ARRAY
-	int i = 1;
-	int endCond = sBlock->numInodes;
-	for(; i < (endCond - 1); i++){
-		fileControlBlock curr = inodes[i];
-		//TODO ENSURE THESE FIELDS ARE CORRECT
-		curr.fileName[0] = '\0';
-		curr.fileSize = 0;
-		curr.parentDir[0] = '\0';
-		curr.inumber = i;
-		curr.parent_inumber = -1;
-		curr.mode = S_IFDIR | 0755;
-
-		curr.uid = getuid();
-		curr.time = time(NULL);
-		initDirContents(&curr);
-
-		sBlock->ibmap[i] = NOT_USED;
-
-		block_write_padded( currBlock, &inodes[i], 
-				sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
-
-		//NEED BLOCK WRITE HERE FOR THE INODES
-		currBlockFillNum++;
-		if(currBlockFillNum >= 6){
-			currBlockFillNum = 0;
-			currBlock++;
-		} 
-
-	}
+	return flushAllInodesTodisk(TRUE);
 }
 
+BOOL flushAllInodesTodisk(BOOL firstTime)
+{
+	if (firstTime == TRUE) {
+		int currBlockFillNum = 1, currBlock = 1;
+		int i = 1;
+		int endCond = sBlock->numInodes;
+
+		for(; i < (endCond-1); i++) {
+			fileControlBlock curr = inodes[i];
+
+			curr.fileName[0] = '\0';
+			curr.fileSize = 0;
+			curr.parentDir[0] = '\0';
+			curr.inumber = i;
+			curr.parent_inumber = -1;
+			curr.mode = S_IFDIR | 0755;
+			curr.uid = getuid();
+			curr.time = time(NULL);
+			initDirContents(&curr);
+			sBlock->ibmap[i] = NOT_USED;
+
+			block_write_padded(currBlock, &inodes[i], sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
+
+			//Need blockwrite here for inodes
+			currBlockFillNum++;
+			if (currBlockFillNum >= 6) {
+				currBlockFillNum = 0;
+				currBlock++;
+			}
+		}
+		return TRUE;
+	} else {
+		int currBlockFillNum = 0, currBlock = 0;
+		int i = 0;
+		int endCond = sBlock->numInodes;
+
+		for(; i < (endCond-1); i++)
+		{
+			fileControlBlock curr = inodes[i];
+			block_write_padded(currBlock, &inodes[i], sizeof(fileControlBlock), currBlockFillNum * sizeof(fileControlBlock));
+
+			currBlockFillNum++;
+			if (currBlockFillNum >= 6) {
+				currBlockFillNum = 0;
+				currBlock++;
+			}
+		}
+		
+		log_msg("\n [flushAllInodesTodisk] updated the inode data on disk \n");
+		return TRUE;
+	}
+
+	return FALSE;
+}

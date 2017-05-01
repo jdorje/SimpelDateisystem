@@ -164,7 +164,7 @@ void *sfs_init(struct fuse_conn_info *conn)
  */
 void sfs_destroy(void *userdata)
 {
-	log_msg("\nsfs_destroy(userdata=0x%08x)\n", userdata);
+	log_msg("\n [sfs_destroy] flushAllInodesTodisk returned %d \n", flushAllInodesTodisk(FALSE));
 }
 
 /** Get file attributes.
@@ -383,9 +383,8 @@ int sfs_write(const char *path, const char *buf, size_t size, off_t offset,
 
 	fileControlBlock *fc = findFileOrDir(path);
 	if (fc != NULL) {
-		int size_of_data_block = 4096;
 		int how_many_pointers = sizeof(fc->block)/sizeof(fc->block[0]); //15
-		int capacity = how_many_pointers * size_of_data_block;
+		int capacity = how_many_pointers * BLOCK_SIZE;
 		if (size <= capacity) {
 			log_msg("\n [sfs_write] size %d less than capacity %d, returning success\n", size, capacity);
 

@@ -7,6 +7,7 @@ BOOL remove_inode(const char *filePath);
 BOOL add_to_direntry(fileControlBlock *parent, fileControlBlock *child);
 BOOL indexed_remove_from_direntry(fileControlBlock* parent, int dirContentIndex);
 BOOL remove_from_direntry(fileControlBlock *parent, fileControlBlock *child);
+BOOL flushAllInodesTodisk(BOOL firstTime);
 
 char *getRelativeParentName(const char *filePath);
 
