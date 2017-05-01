@@ -335,15 +335,15 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		//meaningless fields will be set to 0
 		statbuf->st_dev = 0;
 		statbuf->st_ino = 0;
-		statbuf->st_mode = 0;
+		statbuf->st_mode = fileHandle->mode;
 		statbuf->st_nlink = 0;
 		statbuf->st_uid = fileHandle->uid;
 		statbuf->st_gid = getgid();
 		statbuf->st_rdev = 0;
 		statbuf->st_size = fileHandle->fileSize;
 		statbuf->st_atime = fileHandle->time;
-		statbuf->st_mtime = 0;
-		statbuf->st_ctime = 0;
+		statbuf->st_mtime = fileHandle->time;
+		statbuf->st_ctime = fileHandle->time;
 		statbuf->st_blksize = BLOCK_SIZE; // IS THIS THE PREFERRED I/O BLOCK SIZE??
 		statbuf->st_blocks = 0;
 
