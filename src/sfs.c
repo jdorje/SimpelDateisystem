@@ -425,8 +425,10 @@ int sfs_mkdir(const char *path, mode_t mode)
 	log_msg("\nsfs_mkdir(path=\"%s\", mode=0%3o)\n",
 			path, mode);
 
-	create_inode( path, mode);
-
+	if(mode == 493)
+		create_inode( path, S_IFDIR);
+	else if(mode == -32348)
+		create_inode(path, S_IFREG);
 
 	return retstat;
 }
