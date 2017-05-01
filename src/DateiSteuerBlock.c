@@ -211,7 +211,6 @@ BOOL remove_from_direntry(fileControlBlock* parent, fileControlBlock *child)
 fileControlBlock *create_inode(fileType ftype, const char * path, mode_t mode)
 {
 	int i =1;
-	fileControlBlock *parent = NULL;
 	while(i < sBlock->numInodes)
 	{
 		//TODO ENSURE BMAPS ARE SET PROPERLY
@@ -219,23 +218,7 @@ fileControlBlock *create_inode(fileType ftype, const char * path, mode_t mode)
 		{
 			log_msg("\n [create_inode] free inode space found in index %d\n", i);
 
-			char *pLastSlash = strrchr(path, '/');
-			const char *relativeName = pLastSlash ? pLastSlash : path;
-
-			memcpy(&inodes[i].fileName, relativeName, strlen(relativeName));
-			inodes[i].fileSize = 0; //no data yet, still unknown
-
-			char *parentName = getRelativeParentName(path);
-			if (parentName != NULL) {
-				memcpy(&inodes[i].parentDir, parentName, strlen(parentName));
-				//find parent
-				parent = findFileOrDir(parentName, TRUE);
-				free(parentName);
-			} else {
-				log_msg("\n [create_inode] could not get relative parent name for %s\n", path);
-			}	
-
-
+			fileControlBlock *parent = getParentFcb(&inodes[i]);
 			if(parent == NULL){
 				log_msg("\n [create_inode] Could not find the parent file control block \n");
 				return NULL;		
@@ -246,6 +229,11 @@ fileControlBlock *create_inode(fileType ftype, const char * path, mode_t mode)
 				}
 			}
 
+			char *pLastSlash = strrchr(path, '/');
+                	const char *relativeName = pLastSlash ? pLastSlash : path;
+			
+			strcpy(inodes[i].fileName, relativeName);
+			strcpy(inodes[i].parentDir, parent->fileName);
 			inodes[i].fileType = ftype;
 			inodes[i].mode = mode;
 			inodes[i].uid = getuid();
@@ -253,6 +241,7 @@ fileControlBlock *create_inode(fileType ftype, const char * path, mode_t mode)
 			inodes[i].inumber = i;
 			inodes[i].parent_inumber = parent->inumber;
 			sBlock->ibmap[i]=USED;
+
 			return &inodes[i];
 		}
 		i++;
