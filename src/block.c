@@ -55,6 +55,12 @@ int block_read(const int block_num, void *buf)
     return retstat;
 }
 
+
+/*
+*  Same as block_read except this is used for inodes
+*  The only difference is the offset number used to account for
+*  the current offset in the block
+*/
 int inode_read(const int block_num, void *buf, int offset)
 {
     int retstat = 0;

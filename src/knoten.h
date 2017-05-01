@@ -1,7 +1,4 @@
-#ifndef __KNOTEN_H__
-#define __KNOTEN_H__
-
-
+#pragma once
 #define MAX_BLOCKS 1024
 #define NAME_SIZE 256
 #define MAX_FILES_IN_DIR 30
@@ -49,7 +46,7 @@ struct fileControlBlock {
 
 	char fileName[NAME_SIZE];
 	long fileSize; // number of files in directory or size of actual file
-	char parentDir[NAME_SIZE]; //path of parent directory
+	char parentDir[NAME_SIZE]; //name of parent directory
 	fileType fileType;
 	short mode; //can this file be read/written/executed?
 	short uid; //who owns this file?
@@ -80,5 +77,3 @@ void showInodeNames();
 int getFreeDataBlockNum();
 int getFreeInodeNum();
 int createAllInodes();
-
-#endif

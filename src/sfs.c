@@ -182,9 +182,7 @@ int formatDisk(superblock *sBlock)
 {
 	log_msg("\n Creating file system from scratch...\n");
 
-	//TODO: CALCULATE NUM INODES AT RUNTIME
 	int remainingSpace = diskSize;
-
 	//account for sblock space
 	remainingSpace -= BLOCK_SIZE;
 	int spaceUsed = 0;
@@ -228,13 +226,11 @@ int formatDisk(superblock *sBlock)
 	int currBlockFillNum = 1;
 	int currBlock = 1;
 
-	//TODO: FORMAT ALL INODES HERE!! THE ENTIRE ARRAY
 	int i = 1;
 	int endCond = sBlock->numInodes;
 	for(; i < (endCond - 1); i++){
 
 		fileControlBlock curr = inodes[i];
-		//TODO ENSURE THESE FIELDS ARE CORRECT
 		curr.fileName[0] = '\0';
 		curr.fileSize = 0;
 		curr.parentDir[0] = '\0';
@@ -324,9 +320,9 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 	} else {
 
 		char *pLastSlash = strrchr(path, '/');
-		char *relativeName = pLastSlash ? pLastSlash : path;
+		char *relativeName = pLastSlash ? pLastSlash + 1 : path;
 		// find file 
-		fileControlBlock *fileHandle = findFileOrDir(relativeName, findRootOrDieTrying(), FALSE);
+		fileControlBlock *fileHandle = findFileOrDir(path, findRootOrDieTrying(), FALSE);
 		if(fileHandle == NULL){
 
 			log_msg("\nsfs_getattr(path=\"%s\", statbuf=0x%---------08x);",
@@ -373,18 +369,21 @@ fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BO
 
 	if (strcmp(filePath, "/") == 0) {
 		return findRootOrDieTrying();
-	}
+	}	
+
+	char *pLastSlash = strrchr(filePath, '/');
+	char *relativeName = pLastSlash ? pLastSlash + 1 : filePath;
+
+	char *relativeParentName = getRelativeParentName(filePath);
 
 	int x = 0;
 	while(x < sBlock->numInodes){
 
 		fileControlBlock *currFCB = &inodes[x];
-		char *pLastSlash = strrchr(filePath, '/');
-		char *relativeName = pLastSlash ? pLastSlash : filePath;
 
-		// found the file name
-		//TODO CONFIRM PARENT DIRECTORY IS THE SAME ALSO
-		if(strcmp(currFCB->fileName, relativeName) == 0){
+		// found the file name and it matches the parent name
+		if(strcmp(currFCB->fileName, relativeName) == 0
+			&& strcmp(currFCB->parentDir, relativeParentName) == 0){
 			return currFCB;
 		}
 
@@ -463,12 +462,10 @@ int sfs_unlink(const char *path)
 			//unlink from the linked list structure
 			char* parentDname = &(fcbToUnlink->parentDir[0]);
 			if (parentDname != NULL) {
-				fileControlBlock *parentDir = findFileOrDir(parentDname, root, TRUE);
+				fileControlBlock *parentDir = findFileOrDir(path, root, TRUE);
 
 				if ((parentDir != NULL) && (parentDir->dirContents[0] != NULL)) {
 
-
-					// New code, just use array properties
 					int i = 0;
 					// find where parent points to the unlinked node
 					while (parentDir->dirContents[i] != fcbToUnlink) {
@@ -685,7 +682,7 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 		if(sBlock->ibmap[i]!=USED)
 		{
 			char *pLastSlash = strrchr(path, '/');
-			char *relativeName = pLastSlash ? pLastSlash : path;
+			char *relativeName = pLastSlash ? pLastSlash + 1 : path;
 
 
 			memcpy(&inodes[i].fileName, relativeName, strlen(relativeName));
@@ -696,7 +693,7 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 			{
 				memcpy(&inodes[i].parentDir, parentName, strlen(parentName));
 				//find parent
-				parent = findFileOrDir(parentName, findRootOrDieTrying(), TRUE);
+				parent = findFileOrDir(path, findRootOrDieTrying(), TRUE);
 				free(parentName);
 			}			
 			else
@@ -743,7 +740,6 @@ fileControlBlock *create_inode(fileType ftype, char * path)
 
 			inodes[i].uid = getuid();
 			inodes[i].time = time(NULL);
-			//inodes[i].dirContents = currNode; set at line 719
 			sBlock->ibmap[i]=USED;
 			return &inodes[i];
 		}
