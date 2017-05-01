@@ -103,12 +103,116 @@ int getFreeInodeNum(superblock *sBlock)
 	return -1;
 }
 
+fileControlBlock *getParentFcb(fileControlBlock *child)
+{
+	if (child != NULL) {
+		return &inodes[child->parent_inumber];
+	}
+
+	return NULL;
+}
+
+BOOL add_to_direntry(fileControlBlock* parent, fileControlBlock *child)
+{
+	if ((parent != NULL) && (child != NULL))
+	{
+		if (parent->dirContents == NULL) {
+			log_msg("\n [add_to_direntry] adding new inode to head of parent directory contents \n");
+			parent->dirContents[0] = child;
+		} else {
+			int i;
+			for(i = 0; i < MAX_FILES_IN_DIR; i++) {
+				if (parent->dirContents[i] == NULL) {
+					parent->dirContents[i] = &inodes[i];
+					break;
+				}		
+			}
+
+			if (i > MAX_FILES_IN_DIR) {
+				log_msg("\n [add_to_direntry] more than the maximum files allowed in this entry! \n");
+				return FALSE;
+			} else {
+				log_msg("\n [add_to_direntry] replaced parent directory entry %d with new inode \n", i);
+				return TRUE;
+			}
+		}
+	}
+
+	return FALSE;
+}
+
+BOOL indexed_remove_from_direntry(fileControlBlock* parent, int dirContentIndex)
+{
+	int lastEntryInDirentry = -1;
+
+	if (parent != NULL) {
+		int i;
+		for(i = 0; i < MAX_FILES_IN_DIR; i++) {
+			if (parent->dirContents[i] != NULL) {
+				i++;
+			}
+		}
+		lastEntryInDirentry = i;
+
+		if(lastEntryInDirentry != 0) {
+			if (lastEntryInDirentry == dirContentIndex) {
+				parent->dirContents[lastEntryInDirentry] = NULL;
+				return TRUE;
+			} else {
+				parent->dirContents[dirContentIndex] = parent->dirContents[lastEntryInDirentry];
+				parent->dirContents[lastEntryInDirentry] = NULL;
+				return TRUE;
+			}
+		} else {
+			log_msg("\n [indexed_remove_from_direntry] parent appears to be empty \n");
+		}
+	}
+
+	return FALSE;
+} 
+
+BOOL remove_from_direntry(fileControlBlock* parent, fileControlBlock *child)
+{
+	if ((parent != NULL) && (child != NULL))
+	{
+		if (parent->dirContents != NULL) {
+			int i;
+			for(i = 0; i < MAX_FILES_IN_DIR; i++) {
+				if (parent->dirContents[i] != NULL) {
+					if (parent->dirContents[i]->inumber == child->inumber) {
+						if (indexed_remove_from_direntry(parent, i)) {
+							log_msg("\n [remove_from_direntry] removed %d from direntry \n", i);
+							return TRUE;
+						} else {
+							log_msg("\n [remove_from_direntry] could not remove index number %d from direntry \n", i);
+							return FALSE;
+						}
+					}
+				}
+			}
+
+			if (i > MAX_FILES_IN_DIR) {
+				log_msg("\n [remove_from_direntry] could not find child in parent direntry \n");
+				return FALSE;
+			} else {
+				log_msg("\n [remove_from_direntry] removed child entry %d from parent array \n", i);
+				return TRUE;
+			}
+		} else {
+			log_msg("\n [remove_from_direntry] parent has no directory contents! cannot remove! \n");
+			return FALSE;
+		}
+	}
+
+	return FALSE;
+}
+
 // create_inode assumes it is given an absolute path, which it converts to relative
 fileControlBlock *create_inode(fileType ftype, const char * path)
 {
-	int i =0;
+	int i =1;
 	fileControlBlock *parent = NULL;
-	while(i < sBlock->numDataBlocks)
+	while(i < sBlock->numInodes)
 	{
 		//TODO ENSURE BMAPS ARE SET PROPERLY
 		if(sBlock->ibmap[i]!=USED)
@@ -135,19 +239,11 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 			if(parent == NULL){
 				log_msg("\n [create_inode] Could not find the parent file control block \n");
 				return NULL;		
-			} else if(parent->dirContents == NULL){
-				log_msg("\n [create_inode] adding new inode to head of parent directory contents \n");
-				parent->dirContents[0] = &inodes[i];
 			} else {
-				int x = 0;
-				for(; x < MAX_FILES_IN_DIR; x++){
-
-					if(parent->dirContents[x] == NULL){
-						parent->dirContents[x] = &inodes[i];
-						break;
-					}
+				if (!add_to_direntry(parent, &inodes[i])) {
+					log_msg("\n [create_inode] Could not add new inode to parent directory entry \n");
+					return NULL;
 				}
-				log_msg("\n [create_inode] replaced parent directory entry %d with new inode\n", x);
 			}
 
 			inodes[i].fileType = ftype;
@@ -165,7 +261,8 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 			}
 			inodes[i].uid = getuid();
 			inodes[i].time = time(NULL);
-			//dirContents set elsewhere?
+			inodes[i].inumber = i;
+			inodes[i].parent_inumber = parent->inumber;
 			sBlock->ibmap[i]=USED;
 			return &inodes[i];
 		}
@@ -180,6 +277,24 @@ fileControlBlock *create_inode(fileType ftype, const char * path)
 BOOL remove_inode(fileType type, const char *filePath)
 {
 	log_msg("\n [remove_inode] on %s, currently doing nothing \n", filePath);
+
+	fileControlBlock *f = findFileOrDir(filePath, type);
+	if (f != NULL) {
+		fileControlBlock *p = getParentFcb(f);
+		if (p != NULL) {
+			if (remove_from_direntry(p, f)) {
+				sBlock->ibmap[f->inumber] = NOT_USED;
+				return TRUE;
+			} else {
+				log_msg("\n [remove_inode] could not remove child %s from parent direntry \n", filePath);
+			}
+		} else {
+			log_msg("\n [remove_inode] could not find parent inode for %s so cannot remove \n", filePath);
+		}
+	} else {
+		log_msg("\n [remove_inode] could not find %s \n", filePath);
+	}
+
 	return FALSE;
 }
 
@@ -317,6 +432,8 @@ int formatDisk(superblock *sBlock)
 
 	inodes[0].uid = getuid();
 	inodes[0].time = time(NULL);
+	inodes[0].inumber = 0;
+	inodes[0].parent_inumber = -1;
 	initDirContents(&inodes[0]);
 
 	//write to disk
@@ -337,6 +454,8 @@ int formatDisk(superblock *sBlock)
 		curr.fileName[0] = '\0';
 		curr.fileSize = 0;
 		curr.parentDir[0] = '\0';
+		curr.inumber = i;
+		curr.parent_inumber = -1;
 		curr.fileType = IS_DIR;
 		curr.mode = S_IFDIR;
 

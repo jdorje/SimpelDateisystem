@@ -37,6 +37,9 @@ struct fileControlBlock {
 
 	char fileName[NAME_SIZE];
 	long fileSize; // number of files in directory or size of actual file
+	short numBlocks; //number of blocks used for data
+	short inumber; //its own index number in the array of inodes
+	short parent_inumber; //its parent's inumber
 	char parentDir[NAME_SIZE]; //path of parent directory
 	fileType fileType;
 	short mode; //can this file be read/written/executed?
