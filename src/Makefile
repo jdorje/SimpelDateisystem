@@ -90,7 +90,7 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_sfs_OBJECTS = sfs.$(OBJEXT) log.$(OBJEXT) block.$(OBJEXT)
+am_sfs_OBJECTS = sfs.$(OBJEXT) DateiSteuerBlock.$(OBJEXT) log.$(OBJEXT) block.$(OBJEXT)
 sfs_OBJECTS = $(am_sfs_OBJECTS)
 sfs_LDADD = $(LDADD)
 sfs_DEPENDENCIES =
@@ -242,7 +242,7 @@ target_alias =
 top_build_prefix = ../
 top_builddir = ..
 top_srcdir = ..
-sfs_SOURCES = sfs.c  fuse.h  log.c	log.h  params.h  block.c  block.h
+sfs_SOURCES = sfs.c  dateisteuerblock.h DateiSteuerBlock.c knoten.h fuse.h  log.c	log.h  params.h  block.c  block.h
 AM_CFLAGS = -D_FILE_OFFSET_BITS=64 -I/usr/include/fuse  
 LDADD = -pthread -lfuse  
 all: config.h

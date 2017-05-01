@@ -56,6 +56,19 @@ int block_read(const int block_num, void *buf)
 }
 
 
+int sBlock_read(const int block_num, void *buf, int size)
+{
+ 	int retstat = 0;
+    retstat = pread(diskfile, buf, size, 0);
+    if (retstat <= 0){
+	memset(buf, 0, size);
+	if(retstat<0)
+	perror("block_read failed");
+    }
+
+    return retstat;
+}
+
 /*
 *  Same as block_read except this is used for inodes
 *  The only difference is the offset number used to account for
@@ -64,9 +77,9 @@ int block_read(const int block_num, void *buf)
 int inode_read(const int block_num, void *buf, int offset)
 {
     int retstat = 0;
-    retstat = pread(diskfile, buf, sizeof(fileControlBlock), block_num*BLOCK_SIZE + offset);
+    retstat = pread(diskfile, buf, sizeof(fileControlBlock), (block_num * BLOCK_SIZE) + offset);
     if (retstat <= 0){
-    memset(buf, 0, BLOCK_SIZE);
+    	memset(buf, 0, BLOCK_SIZE);
     if(retstat<0)
     perror("block_read failed");
     }
@@ -88,15 +101,35 @@ int block_write(const int block_num, const void *buf)
     return retstat;
 }
 
+int sBlock_write_padded(const int block_num, const void *buf, int size)
+{
+    int retstat = 0;
+    char tmp_buffer[size];
+    memset(tmp_buffer, '0', sizeof(tmp_buffer));
+
+	
+    retstat = pwrite(diskfile, tmp_buffer, sizeof(tmp_buffer), 0);
+    if (retstat >= 0) {
+        retstat = pwrite(diskfile, buf, size, 0);
+    }
+
+    if (retstat < 0)
+    	perror("block_write failed");
+
+    return retstat;
+}
+
+
 int block_write_padded(const int block_num, const void *buf, int size, int offset)
 {
     int retstat = 0;
     char tmp_buffer[BLOCK_SIZE];
     memset(tmp_buffer, '0', sizeof(tmp_buffer));
 
-    retstat = pwrite(diskfile, tmp_buffer, BLOCK_SIZE, block_num*BLOCK_SIZE + offset);
+    retstat = pwrite(diskfile, tmp_buffer, size, (block_num * BLOCK_SIZE) + offset);
     if (retstat >= 0) {
-        retstat = pwrite(diskfile, buf, size, block_num*BLOCK_SIZE + offset);
+        retstat = pwrite(diskfile, buf, size, 
+			(block_num * BLOCK_SIZE) + offset);
     }
 
     if (retstat < 0)

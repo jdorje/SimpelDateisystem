@@ -1,13 +1,7 @@
 #pragma once
-#define MAX_BLOCKS 1024
+#define MAX_BLOCKS 5859
 #define NAME_SIZE 256
 #define MAX_FILES_IN_DIR 30
-
-typedef enum {
-	NOT_USED,
-	USED
-
-} status;
 
 typedef enum {
 	FALSE,
@@ -25,9 +19,10 @@ typedef struct {
 	int numDataBlocks; // total number of data blocks
 	int inodeStartIndex; //the index of the start of the first inode
 	int datablockStartIndex; //the index of the start of the first data block
-	
-	status ibmap[MAX_BLOCKS];
-	status dbmap[MAX_BLOCKS];
+	int numInodesPerBlock;
+
+	unsigned char ibmap[MAX_BLOCKS];
+	unsigned char dbmap[MAX_BLOCKS];
 
 } superblock;
 
@@ -51,18 +46,3 @@ struct fileControlBlock {
 
 
 
-fileControlBlock *findFileOrDir(const char *filePath, fileControlBlock *curr, BOOL isDir);
-fileControlBlock *findRootOrDieTrying();
-fileControlBlock *getParentFcb(fileControlBlock *child);
-
-fileControlBlock *create_inode(fileType type, char *filePath);
-int formatDisk(superblock *sBlock);
-char *getRelativeParentName(char *filePath);
-BOOL remove_inode(fileType type, char *filePath);
-void initDirContents(fileControlBlock *fcb);
-
-void showInodeNames();
-
-int getFreeDataBlockNum();
-int getFreeInodeNum();
-int createAllInodes();
