@@ -1,5 +1,4 @@
 fileControlBlock *findFileOrDir(const char *filePath);
-fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr);
 fileControlBlock *findRootOrDieTrying();
 fileControlBlock *getParentFcb(fileControlBlock *child);
 fileControlBlock *create_inode(const char *filePath, mode_t mode);

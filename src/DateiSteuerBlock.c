@@ -230,8 +230,8 @@ fileControlBlock *create_inode(const char * path, mode_t mode)
 			}
 
 			char *pLastSlash = strrchr(path, '/');
-                	const char *relativeName = pLastSlash ? pLastSlash+1 : path;
-			
+			const char *relativeName = pLastSlash ? pLastSlash+1 : path;
+
 			strcpy(inodes[i].fileName, relativeName);
 			strcpy(inodes[i].parentDir, parent->fileName);
 			inodes[i].mode = mode;
@@ -290,58 +290,42 @@ void showInodeNames()
 	}
 }
 
-fileControlBlock* findFileOrDir(const char *filePath)
-{
-	fileControlBlock* root = findRootOrDieTrying();
-	if (root != NULL) {
-		return findFileOrDirInternal(filePath, root);
-	}
-
-	log_msg("\n[findFileOrDir] could not find parent directory root\n");
-	return NULL;
-}
-
 /*
  *  findFileOrDir ASSUMES YOU ARE GIVEN AN ABSOLUTE PATH NAME AND STRIPS IT DOWN TO RELATIVE NAME
  */
 
-fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr)
+fileControlBlock *findFileOrDir(const char *filePath)
 {
 	if (strcmp(filePath, "/") == 0) {
 		return findRootOrDieTrying();
-	}
-
-	int x = 0;
-	while(x < sBlock->numInodes){
-		fileControlBlock *currFCB = &inodes[x];
+	} else {
 		char *pLastSlash = strrchr(filePath, '/');
-		const char *relativeName = pLastSlash ? pLastSlash : filePath;
+		const char *relativeName = pLastSlash ? pLastSlash+1 : filePath;
 
-		if(strcmp(currFCB->fileName, relativeName) == 0){
-
-			char* RelativeParentName = getRelativeParentName(filePath);
-			if (RelativeParentName != NULL) {
-
-				char* currInodeParentName = &currFCB->parentDir[0];
-				if (currInodeParentName != NULL) {
-					if (strcmp(currInodeParentName, RelativeParentName) == 0) {
-						log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) for inode %d match \n", RelativeParentName, currInodeParentName, x);
-					} else {
-						log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) do not match but returning finding anyway. \n", RelativeParentName, currInodeParentName);
+		int x;
+		for(x = 0; x < sBlock->numInodes; x++){
+			fileControlBlock *currFCB = &inodes[x];
+			if(strcmp(currFCB->fileName, relativeName) == 0){
+				char* RelativeParentName = getRelativeParentName(filePath);
+				if (RelativeParentName != NULL) {
+					char* currInodeParentName = &currFCB->parentDir[0];
+					if (currInodeParentName != NULL) {
+						if (strcmp(currInodeParentName, RelativeParentName) == 0) {
+							log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) for inode %d match \n", RelativeParentName, currInodeParentName, x);
+						} else {
+							log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) do not match but returning finding anyway. \n", RelativeParentName, currInodeParentName);
+						}
 					}
+
+					free(RelativeParentName);
+				} else {
+					log_msg("\n [findFileOrDir] could not find relative parent name for %s \n", filePath);
 				}
 
-				free(RelativeParentName);
-			} else {
-				log_msg("\n [findFileOrDir] could not find relative parent name for %s \n", filePath);
+				return currFCB;
 			}
-
-			return currFCB;
 		}
-
-		x++;
 	}
-
 	return NULL;
 
 }
