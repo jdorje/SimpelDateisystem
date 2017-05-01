@@ -229,7 +229,13 @@ int sfs_getattr(const char *path, struct stat *statbuf)
 		//meaningless fields will be set to 0
 		statbuf->st_dev = 0;
 		statbuf->st_ino = 0;
-		statbuf->st_mode = fileHandle->mode;
+
+		//TODO ENSURE THIS IS CORRECT FLAGS!!
+		if(fileHandle->mode == 493 || fileHandle->mode == 16384)
+			statbuf->st_mode = S_IFDIR;
+		else if(fileHandle->mode == -32348)
+			statbuf->st_mode = S_IFREG;
+
 		statbuf->st_nlink = 0;
 		statbuf->st_uid = fileHandle->uid;
 		statbuf->st_gid = getgid();
