@@ -325,9 +325,9 @@ fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *
 				char* currInodeParentName = &currFCB->parentDir[0];
 				if (currInodeParentName != NULL) {
 					if (strcmp(currInodeParentName, RelativeParentName) == 0) {
-						log_msg("\n [findFileOrDir] relativeName (%s) and RelativeParentName (%s) for inode %d match \n", currInodeParentName, RelativeParentName, x);
+						log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) for inode %d match \n", RelativeParentName, currInodeParentName, x);
 					} else {
-						log_msg("\n [findFileOrDir] given relativeName (%s) and found relativeName (%s) do not match but returning finding anyway. \n", relativeName, RelativeParentName);
+						log_msg("\n [findFileOrDir] given and found parent relative names (%s, %s) do not match but returning finding anyway. \n", RelativeParentName, currInodeParentName);
 					}
 				}
 
