@@ -422,7 +422,7 @@ int sfs_mkdir(const char *path, mode_t mode)
 /** Remove a directory */
 int sfs_rmdir(const char *path)
 {
-	log_msg("\n[sfs_rmdir] passing %s to remove_inode\n", path); 
+	log_msg("\n [sfs_rmdir] passing %s to remove_inode\n", path); 
 
 	if (remove_inode(path) == FALSE) {
 		errno = ENOENT;

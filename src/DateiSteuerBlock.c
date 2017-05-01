@@ -152,9 +152,9 @@ BOOL indexed_remove_from_direntry(fileControlBlock* parent, int dirContentIndex)
 				i++;
 			}
 		}
-		lastEntryInDirentry = i;
+		lastEntryInDirentry = i-1;
 
-		if(lastEntryInDirentry != 0) {
+		if(lastEntryInDirentry != -1) {
 			if (lastEntryInDirentry == dirContentIndex) {
 				parent->dirContents[lastEntryInDirentry] = NULL;
 				return TRUE;
@@ -253,8 +253,6 @@ fileControlBlock *create_inode(const char * path, mode_t mode)
 
 BOOL remove_inode(const char *filePath)
 {
-	log_msg("\n [remove_inode] on %s, currently doing nothing \n", filePath);
-
 	fileControlBlock *f = findFileOrDir(filePath);
 	if (f != NULL) {
 		fileControlBlock *p = getParentFcb(f);
