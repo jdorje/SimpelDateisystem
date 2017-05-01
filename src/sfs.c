@@ -77,10 +77,11 @@ void *sfs_init(struct fuse_conn_info *conn)
 	int ret = sBlock_read(0, buf, sizeof(superblock));
 	log_msg("\n First block read result: %d \n", ret);
 
-	// see if filesystem already exists
-	if( ret >= 0){
-
+	if(ret == 0){
 		formatDisk(sBlock);
+	}
+	// see if filesystem already exists
+	else if( ret >= 0){
 
 		log_msg("\n Superblock loaded...\n");
 		memcpy(sBlock, buf, sizeof(superblock));
