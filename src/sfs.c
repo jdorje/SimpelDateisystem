@@ -258,63 +258,26 @@ int sfs_getattr(const char *path, struct stat *statbuf)
  */
 int sfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-	int retstat = 0;
+	log_msg("\n [sfs_create] passing %s to create_inode \n", path);
 
-	// find inode with the specific path
-	// if it does not exist, create an inode for it
-	fileControlBlock *inode = findFileOrDir(path, FALSE);
-	if(inode == NULL)
-	{
-		log_msg("\n [sfs_create] %s not found, passing to create_inode\n", path);
-		create_inode(IS_FILE ,path);			
-	} 
-	// open the inode
-	else {
-		log_msg("\n [sfs_create] %s found, should I call open? Doing nothing but returning success \n", path);
-		//TODO: how to open a file??
+	if (create_inode(IS_FILE, path) == NULL) {
+		return -errno;
 	}
 
-	return retstat;
+	return 0;
 }
 
 /** Remove a file */
 int sfs_unlink(const char *path)
 {
-	int retstat = -1;
-	log_msg("sfs_unlink(path=\"%s\")\n", path);
+        log_msg("\n[sfs_unlink] passing %s to remove_inode\n", path);
 
-	fileControlBlock *fcbToUnlink = findFileOrDir(path, FALSE);
-	if (fcbToUnlink != NULL) {
-		//unlink from the linked list structure
-		char* parentDname = &(fcbToUnlink->parentDir[0]);
-		if (parentDname != NULL) {
-			fileControlBlock *parentDir = findFileOrDir(parentDname, TRUE);
-			if ((parentDir != NULL) && (parentDir->dirContents[0] != NULL)) {
-				// New code, just use array properties
-				int i = 0;
-				// find where parent points to the unlinked node
-				while (parentDir->dirContents[i] != fcbToUnlink) {
-					parentDir->dirContents[i] = NULL;
-					i++;
-				}
-				log_msg("\n[sfs_unlink] unlinked %s from parentDir at dirContents[%d]\n", path, i);
-				retstat = 0;
-				//TODO: free block data.
-				//TODO: update the inode bitmap entry
-			} else {
-				log_msg("[sfs_unlink] cannot get a handle on the parent directory\n OR parentDir is null so I can't get head");
-				errno = EIO;
-			}
-		} else {
-			log_msg("[sfs_unlink] no name for parent directory?");
-			errno = EIO;
-		}
-	} else {
-		log_msg("[sfs_unlink] unable to find file you want to remove");
-		errno = ENOENT;
-	}
+        if (remove_inode(IS_FILE, path) == FALSE) {
+                errno = ENOENT;
+                return -errno;
+        }
 
-	return retstat;
+        return 0;
 }
 
 /** File open operation
@@ -453,7 +416,6 @@ int sfs_mkdir(const char *path, mode_t mode)
 	if (create_inode(IS_DIR, path) != NULL) {
 		return 0;
 	}
-
 
 	return -1;
 }
