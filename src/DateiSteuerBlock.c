@@ -208,7 +208,7 @@ BOOL remove_from_direntry(fileControlBlock* parent, fileControlBlock *child)
 }
 
 // create_inode assumes it is given an absolute path, which it converts to relative
-fileControlBlock *create_inode(fileType ftype, const char * path, mode_t mode)
+fileControlBlock *create_inode(const char * path, mode_t mode)
 {
 	int i =1;
 	while(i < sBlock->numInodes)
@@ -234,7 +234,6 @@ fileControlBlock *create_inode(fileType ftype, const char * path, mode_t mode)
 			
 			strcpy(inodes[i].fileName, relativeName);
 			strcpy(inodes[i].parentDir, parent->fileName);
-			inodes[i].fileType = ftype;
 			inodes[i].mode = mode;
 			inodes[i].uid = getuid();
 			inodes[i].time = time(NULL);
@@ -252,11 +251,11 @@ fileControlBlock *create_inode(fileType ftype, const char * path, mode_t mode)
 }
 
 
-BOOL remove_inode(fileType type, const char *filePath)
+BOOL remove_inode(const char *filePath)
 {
 	log_msg("\n [remove_inode] on %s, currently doing nothing \n", filePath);
 
-	fileControlBlock *f = findFileOrDir(filePath, type);
+	fileControlBlock *f = findFileOrDir(filePath);
 	if (f != NULL) {
 		fileControlBlock *p = getParentFcb(f);
 		if (p != NULL) {
@@ -291,11 +290,11 @@ void showInodeNames()
 	}
 }
 
-fileControlBlock* findFileOrDir(const char *filePath, BOOL isDir)
+fileControlBlock* findFileOrDir(const char *filePath)
 {
 	fileControlBlock* root = findRootOrDieTrying();
 	if (root != NULL) {
-		return findFileOrDirInternal(filePath, root, isDir);
+		return findFileOrDirInternal(filePath, root);
 	}
 
 	log_msg("\n[findFileOrDir] could not find parent directory root\n");
@@ -306,7 +305,7 @@ fileControlBlock* findFileOrDir(const char *filePath, BOOL isDir)
  *  findFileOrDir ASSUMES YOU ARE GIVEN AN ABSOLUTE PATH NAME AND STRIPS IT DOWN TO RELATIVE NAME
  */
 
-fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr, BOOL isDir)
+fileControlBlock *findFileOrDirInternal(const char *filePath, fileControlBlock *curr)
 {
 	if (strcmp(filePath, "/") == 0) {
 		return findRootOrDieTrying();
@@ -405,7 +404,6 @@ int formatDisk(superblock *sBlock)
 	inodes[0].fileName[1] = '\0';
 	inodes[0].fileSize = 0;
 	inodes[0].parentDir[0] = '\0';
-	inodes[0].fileType = IS_DIR;
 	inodes[0].mode = S_IFDIR | 0755;
 
 	inodes[0].uid = getuid();
@@ -434,8 +432,7 @@ int formatDisk(superblock *sBlock)
 		curr.parentDir[0] = '\0';
 		curr.inumber = i;
 		curr.parent_inumber = -1;
-		curr.fileType = IS_DIR;
-		curr.mode = S_IFDIR;
+		curr.mode = S_IFDIR | 0755;
 
 		curr.uid = getuid();
 		curr.time = time(NULL);
