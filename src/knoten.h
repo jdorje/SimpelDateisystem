@@ -15,8 +15,8 @@ typedef enum {
 } status;
 
 typedef enum {
-	TRUE,
-	FALSE
+	FALSE,
+	TRUE
 } BOOL;
 
 typedef struct fileControlBlock fileControlBlock;
